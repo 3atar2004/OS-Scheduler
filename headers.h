@@ -34,9 +34,6 @@ typedef struct PCB
     int stopped_time;
     int restarted_time;
     int remainingTimeAfterStop;
-    int memsize;
-    int start_address;
-    int end_address;
 } PCB;
 
 enum STATE
@@ -305,98 +302,7 @@ void freePriQueue(PriorityQueue *pq)
     free(pq);
 }
 
-typedef struct BuddyMemory
-{
-    int memsize;
-    int start;
-    bool is_free;
-    int pcbID;
-    struct BuddyMemory *left;
-    struct BuddyMemory *right;
-} BuddyMemory;
 
-// typedef struct MemoryHead
-// {
-//     struct BuddyMemory *root;
-// } MemoryHead;
-
-bool allocate(BuddyMemory *head, PCB *pcb)
-{
-    if (!pcb){
-        return false;
-    }
-    if (!head)
-        return false;
-    if (!head->is_free)
-        return false;
-    if (head->memsize < pcb->memsize)
-        return false;
-    if (head->memsize == pcb->memsize && !head->left)
-    {
-        head->pcbID = pcb->id;
-        pcb->start_address = head->start;
-        pcb->end_address = head->start + head->memsize - 1;
-        head->is_free = false;
-        return true;
-    }
-    if (head->memsize >= pcb->memsize)
-    {
-        if (head->memsize / 2 < pcb->memsize && !head->left)
-        {
-            head->pcbID = pcb->id;
-            pcb->start_address = head->start;
-            pcb->end_address = head->start + head->memsize - 1;
-            head->is_free = false;
-            return true;
-        }
-        if (!head->left)
-        {
-            BuddyMemory *left = malloc(sizeof(BuddyMemory));
-            BuddyMemory *right = malloc(sizeof(BuddyMemory));
-            head->left = left;
-            head->left->start = head->start;
-            head->left->memsize = head->memsize / 2;
-            head->left->is_free = true;
-            head->right = right;
-            head->right->memsize = head->memsize / 2;
-            head->right->start = head->start + head->memsize / 2;
-            head->right->is_free = true;
-        }
-        bool leftAllocate = allocate(head->left,pcb);
-        bool rightAllocate = false;
-        if (!leftAllocate){
-            rightAllocate = allocate(head->right,pcb);
-        }
-        return leftAllocate || rightAllocate;
-    }
-}
-
-void deallocate(BuddyMemory *head, int pcbStart)
-{
-    if (!head)
-        return;
-    if (!head->is_free && head->start == pcbStart)
-    {
-        head->is_free = true;
-        head->pcbID = -1;
-        return;
-    }
-    if (!head->left || !head->right)
-        return;
-    deallocate(head->left, pcbStart);
-    deallocate(head->right, pcbStart);
-    if (head->left && head->right && head->left->is_free && head->right->is_free)
-    {
-        if (!head->left->right && !head->left->left && !head->right->left && !head->right->right)
-        {
-            free(head->left);
-            free(head->right);
-            head->left = NULL;
-            head->right = NULL;
-        }
-    }
-}
-void displayTree(BuddyMemory *head, int depth, const char *position)
 {
     if (!head)
     {
