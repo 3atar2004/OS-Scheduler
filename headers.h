@@ -302,42 +302,6 @@ void freePriQueue(PriorityQueue *pq)
     free(pq);
 }
 
-
-{
-    if (!head)
-    {
-        return;
-    }
-
-    // Indent based on depth to visualize tree levels
-    for (int i = 0; i < depth; i++)
-    {
-        printf("  ");
-    }
-
-    // Display whether the block is "Left" or "Right" or "Root"
-    if (position)
-    {
-        printf("[%s] ", position);
-    }
-
-    // Print information about the block
-    printf("Block: Start=%d, Size=%d, Free=%s",
-           head->start, head->memsize, head->is_free ? "Yes" : "No");
-
-    // If allocated, display the PCB ID and memory range
-    if (!head->is_free && head->pcbID != -1)
-    {
-        printf(", Allocated to PCB ID=%d (Start=%d, End=%d)",
-               head->pcbID, head->start, head->start + head->memsize - 1);
-    }
-
-    printf("\n");
-
-    // Recursively display left and right children
-    displayTree(head->left, depth + 1, "Left");
-    displayTree(head->right, depth + 1, "Right");
-}
 // void printQueue(CircularQueue *q)
 // {
 //     if(isEmpty(q))
