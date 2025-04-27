@@ -16,9 +16,9 @@ int main(int argc, char *argv[])
     }
     key_t msg_id=ftok("msgqueue", 65);
     int msgq_id=msgget(msg_id, 0666|IPC_CREAT);
-     while(queueopen)
+
+    while(queueopen)
     {
-        
         msgbuff msg;
         int rec_val=msgrcv(msgq_id, &msg, sizeof(msg) - sizeof(long), 1, !IPC_NOWAIT);
         printf("Recieved process %d at time %d and runtime %d and priority %d\n",msg.pcb.id,getClk(),msg.pcb.runtime,msg.pcb.priority);
