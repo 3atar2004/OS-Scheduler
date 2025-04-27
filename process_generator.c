@@ -5,12 +5,11 @@ int msgq_id;
 
 int main(int argc, char *argv[])
 {
-    //destroyClk(true);
     signal(SIGINT, clearResources);
     // TODO Initialization
-    if(argc<4)
+    if (argc < 2)
     {
-        printf("incorrect number of arguments\n");
+        printf("Invalid number of arguments!\n");
         exit(1);
     }
      // 1. Read the input files.
@@ -23,10 +22,13 @@ int main(int argc, char *argv[])
         printf("Error opening file\n");
         exit(1);
     }
-    int id,arrival,runtime,priority;
+    int id, arrival, runtime, priority;
     fscanf(pFile,"%*[^\n]\n");
+    printf("-----------------------------Processes------------------------------\n");
+    int count = 1;
     while(fscanf(pFile,"%d\t%d\t%d\t%d\n",&id,&arrival,&runtime,&priority)==4)
     {
+        printf("Process %d:\t", count);
         printf("%d\t%d\t%d\t%d\n",id,arrival,runtime,priority);
         PCB *readpcb = malloc(sizeof(PCB));
         readpcb->id = id;
@@ -34,65 +36,105 @@ int main(int argc, char *argv[])
         readpcb->runtime = runtime;
         readpcb->priority = priority;
         enqueue(PCBs,readpcb); 
+        count++;
     }
     fclose(pFile);
     //printQueue(PCBs);
 
     // 2. Read the chosen scheduling algorithm and its parameters, if there are any from the argument list.
-    ///    1- non preemptive HPF
-    ///    2- SRTN
-    ///    3- RR
-    int chosenalgorithm=atoi(argv[2]);
-    int quantum=atoi(argv[3]);
-    printf("You chose:");
-    switch (chosenalgorithm)
+    ///    1- Non-preemptive Highest Priority First (HPF)
+    ///    2- Shortest Remaining Time Next (SRTN)
+    ///    3- Round Robin (RR)
+    int chosenAlgorithm;
+    printf("Enter a scheduling algorithm:\n");
+    printf("1 - Non-preemptive Highest Priority First (HPF)\n");
+    printf("2 - Shortest Remaining Time Next (SRTN)\n");
+    printf("3 - Round Robin (RR)\n");
+    printf("Please enter the number corresponding to your choice: ");
+
+    scanf("%d", &chosenAlgorithm);
+    while (chosenAlgorithm != 1 && chosenAlgorithm != 2 && chosenAlgorithm != 3)
+    {
+        printf("Invalid algorithm number!\n");
+        printf("Please enter the number corresponding to your choice: ");
+        scanf("%d", &chosenAlgorithm);
+    }
+
+    int quantum;
+    if (chosenAlgorithm == 3)
+    {
+        printf("Enter quantum: ");
+        scanf("%d", &quantum);
+        while (quantum < 0)
+        {
+            printf("Quantum must greater than or equal zero!\n");
+            printf("Enter the quantum for Round Robin (RR): ");
+            scanf("%d", &quantum);
+        }
+    }
+
+
+    char chosenAlgorithm_str[2];
+    char quantum_str[2];
+    sprintf(chosenAlgorithm_str, "%d", chosenAlgorithm);
+    sprintf(quantum_str, "%d", quantum);
+
+    printf("You selected ");
+    switch (chosenAlgorithm)
     {
     case 1:
-        printf("Non Preemptive HPF\n");
+        printf("Non-preemptive Highest Priority First (HPF)\n");
         break;
     case 2:
-        printf("SRTN\n");
+        printf("Shortest Remaining Time Next (SRTN)\n");
         break;
     case 3:   
-        printf("Round Robin with quantum %d\n",quantum);
-        if(quantum<=0)
-        {
-            printf("Quantum must be greater than 0\n");
-            exit(1);
-        }
+        printf("Round Robin (RR) with quantum %d\n",quantum);
         break;
-    
     default:
         break;
     }
 
     // 3. Initiate and create the scheduler and clock processes.
     int schedulerid=fork();
+    if (schedulerid == -1) 
+    {
+        perror("Error forking scheduler!");
+        exit(1);
+    }
     if(schedulerid==0)
     {
         int compilestatus=system("gcc scheduler.c -o scheduler.out");
         if(compilestatus==0)
         {
-            execl("./scheduler.out", "scheduler.out", argv[2], argv[3], NULL); // runing the scheduler with chosen algorithm and quantum
-            printf("Error in execl\n");
-
+            printf("Scheduler process started!\n");
+            execl("./scheduler.out", "scheduler.out", chosenAlgorithm_str, quantum_str, NULL); // runing the scheduler with chosen algorithm and quantum
+            printf("Error executing scheduler!");
+            exit(1);
         }
         else
         {
-            printf("Error in compiling scheduler\n");
+            printf("Error in compiling scheduler!\n");
             exit(1);
         }
     }
   
     // 4. Use this function after creating the clock process to initialize clock.
     int clckid=fork();
+    if (clckid == -1) 
+    {
+        perror("Error forking clock");
+        exit(1);
+    }
     if(clckid==0)
     {
         int clkcompilestatus=system("gcc clk.c -o clk.out");
         if(clkcompilestatus==0)
         {
+            printf("Clock process started!\n");
             execl("./clk.out", "clk.out", NULL); // runing the clock
-            printf("Error in execl\n");
+            printf("Error executing scheduler!");
+            exit(1);
         }
         else
         {
@@ -102,8 +144,8 @@ int main(int argc, char *argv[])
     }
     initClk();
     // To get time use this function. 
-     int x = getClk();
-     printf("Current Time is %d\n", x);
+    int x = getClk();
+    printf("Current Time is %d\n", x);
     // TODO Generation Main Loop
     // 5. Create a data structure for processes and provide it with its parameters.
     // 6. Send the information to the scheduler at the appropriate time.
@@ -130,6 +172,7 @@ int main(int argc, char *argv[])
         process.pcb.state=READY;
         while(getClk() < currentpcb->arrival_time);
         printf("Sending process %d with arrival time %d and runtime %d and priority %d\n",process.pcb.id,process.pcb.arrival_time,process.pcb.runtime,process.pcb.priority);
+        printf("Current Clock Time: %d\n", getClk());
         process.mtype=1;
         send_val=msgsnd(msgq_id,&process,sizeof(process.pcb),!IPC_NOWAIT);
         if(send_val==-1)
