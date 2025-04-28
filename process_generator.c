@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
     }
     struct msgbuff process;
      while(!isEmpty(PCBs))
-     {
+    {
         PCB* currentpcb;
         dequeue(PCBs,&currentpcb);
         process.pcb.id=currentpcb->id;
@@ -176,12 +176,13 @@ int main(int argc, char *argv[])
         printf("Current Clock Time: %d\n", getClk());
         process.mtype=1;
         send_val=msgsnd(msgq_id,&process,sizeof(process.pcb),!IPC_NOWAIT);
+        printf("Ana ba3at!\n");
         if(send_val==-1)
         {
             printf("Error in sending message\n");
         }
         free(currentpcb);
-     }
+    }
     kill(schedulerid, SIGUSR2); // send signal that i won't be sending any proccesses.
     int stat;
     wait(&stat); // wait for scheduler to finish
