@@ -31,6 +31,7 @@ int main(int argc, char *argv[])
         printf("Process %d:\t", count);
         printf("%d\t%d\t%d\t%d\n",id,arrival,runtime,priority);
         PCB *readpcb = malloc(sizeof(PCB));
+        printf("Testing ID: %d", id);
         readpcb->id = id;
         readpcb->arrival_time = arrival;
         readpcb->runtime = runtime;
@@ -72,7 +73,6 @@ int main(int argc, char *argv[])
             scanf("%d", &quantum);
         }
     }
-
 
     char chosenAlgorithm_str[2];
     char quantum_str[2];
@@ -165,6 +165,7 @@ int main(int argc, char *argv[])
         dequeue(PCBs,&currentpcb);
         process.pcb.id=currentpcb->id;
         process.pcb.arrival_time=currentpcb->arrival_time;
+        process.pcb.start_time=-1;
         process.pcb.runtime=currentpcb->runtime;
         process.pcb.remaining_time=currentpcb->runtime;
         process.pcb.waiting_time=0;
