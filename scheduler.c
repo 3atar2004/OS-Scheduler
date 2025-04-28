@@ -1,5 +1,7 @@
 #include "headers.h"
+#include <unistd.h>
 int queueopen=1;
+int currentTime = 0;
 void terminategenerator(int signum);
 void HPF();
 void SRTN();
@@ -54,6 +56,7 @@ int main(int argc, char *argv[])
     //TODO: upon termination release the clock resources.
 
     destroyClk(true);
+    printf("Ana wasalt ba3d el clock!");
     return(0);
 }
 void HPF()
@@ -79,104 +82,101 @@ void RR(int quantum)
     {
         msgbuff msg;
         int status = msgrcv(msgq_id, &msg, sizeof(msg) - sizeof(long), 1, IPC_NOWAIT);
+
         if (status != -1) // A new process has arrived
         {
             PCB *arrivedPCB = malloc(sizeof(PCB));
-            arrivedPCB->arrival_time = msg.pcb.arrival_time;
-            arrivedPCB->finished_time = msg.pcb.finished_time;
-            arrivedPCB->id = msg.pcb.id;
-            arrivedPCB->pid = msg.pcb.pid;
-            arrivedPCB->priority = msg.pcb.priority;
-            arrivedPCB->remaining_time = msg.pcb.remaining_time;
-            arrivedPCB->remainingTimeAfterStop = msg.pcb.remainingTimeAfterStop;
-            arrivedPCB->restarted_time = msg.pcb.restarted_time;
-            arrivedPCB->runtime = msg.pcb.runtime;
-            arrivedPCB->start_time = msg.pcb.start_time;
-            arrivedPCB->state = msg.pcb.state;
-            arrivedPCB->stopped_time = msg.pcb.stopped_time;
-            arrivedPCB->waiting_time = msg.pcb.waiting_time;
+            *arrivedPCB = msg.pcb;
             enqueue(PCBs, arrivedPCB); // Put process at end of queue
         }
 
         if (queueopen) // If still expecting new processes from generator
         {
-            if (isEmpty(PCBs)) continue; // No processes are available at the moment to run
+            if (isEmpty(PCBs))
+            {
+                sleep(1);
+                currentTime++;
+            }
         }
         else if (!queueopen) // If no more expecting new processes
         {
-            if (isEmpty(PCBs)) break;
+            if (status == -1 && isEmpty(PCBs)) // No more messages and queue is empty
+            {
+                break;
+            }
         }
 
         dequeue(PCBs, &runningPCB);
 
         runningPCB->state = RUNNING;
-        int currentTime = getClk();
         int processID = runningPCB->id;
-        char processState [15];
         int arrivalTime = runningPCB->arrival_time;
         int totalRunningTime = runningPCB->runtime;
         int remainingRunningTime = runningPCB->remaining_time;
         int waitingTime = runningPCB->waiting_time;
 
+        char processState [15];
+
         if (runningPCB->start_time == -1) // Check if process hasn't been run before (first timer)
         {
-            runningPCB->start_time = getClk();
+            runningPCB->start_time = currentTime;
             strcpy(processState, stateStrings[STARTED]); // Get string equivalent of state 
             fprintf(fptr, "At  time  %d  process  %d  %s  arr  %d  total  %d  remain %d  wait %d\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime);
-            printf("At  time  %d  process  %d  %s  arr  %d  total  %d  remain %d  wait %d\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime);
+            //printf("At  time  %d  process  %d  %s  arr  %d  total  %d  remain %d  wait %d\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime);
         }
         else // This process has run before (will resume)
         {
             strcpy(processState, stateStrings[RESUMED]); // Get string equivalent of state 
             fprintf(fptr, "At  time  %d  process  %d  %s  arr  %d  total  %d  remain %d  wait %d\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime);
-            printf("At  time  %d  process  %d  %s  arr  %d  total  %d  remain %d  wait %d\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime);
+            //printf("At  time  %d  process  %d  %s  arr  %d  total  %d  remain %d  wait %d\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime);
         }
 
-        int readyProcessesWaitingTime = quantum;
+        int processingTime = quantum;
         // Now processing the current process
-        if (remainingRunningTime < quantum) // Process will not take whole quantum
+        if (remainingRunningTime < quantum) // Process will not take whole quantum and will finish
         {
-            readyProcessesWaitingTime = remainingRunningTime;
+            processingTime = remainingRunningTime;
             remainingRunningTime = 0; // Now process is finished
         }
         else // Process will take whole quantum
         {
-            remainingRunningTime -= quantum;
+            remainingRunningTime -= processingTime;
         }
 
-        runningPCB->remainingTimeAfterStop = remainingRunningTime;
+        runningPCB->remaining_time = remainingRunningTime; // Adjust remaining time after processing
 
-        // Need to no adjust waiting times for all the processes in the ready qeueue
-        updateWaitingTimes(PCBs, readyProcessesWaitingTime);
+        // Need to now adjust waiting times for all the processes in the ready qeueue
+        updateWaitingTimes(PCBs, processingTime);
         
+        sleep(processingTime); // To syncronize clock
+
         // Now scheduler is done with this process
         // Need to check if process is finished or will be stopped
+        currentTime += processingTime; // update time after process is done with cpu
 
-        if (runningPCB->remainingTimeAfterStop == 0) // Process is finished (No need to bring back to queue)
+        if (runningPCB->remaining_time == 0) // Process is finished (No need to bring back to queue)
         {
             strcpy(processState, stateStrings[FINISHED]); // Get string equivalent of state
-            runningPCB->finished_time = getClk(); 
+            runningPCB->finished_time = currentTime + processingTime; 
             
             // Turnaround time = Finish time - Arrival time
             int TA = runningPCB->finished_time - runningPCB->arrival_time;
             float WTA = (float)TA / runningPCB->runtime;
 
             fprintf(fptr, "At  time  %d  process  %d  %s  arr  %d  total  %d  remain  %d  wait  %d  TA  %d  WTA  %f\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime, TA, WTA);
-            fprintf("At  time  %d  process  %d  %s  arr  %d  total  %d  remain  %d  wait  %d  TA  %d  WTA  %f\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime, TA, WTA);
+            //fprintf("At  time  %d  process  %d  %s  arr  %d  total  %d  remain  %d  wait  %d  TA  %d  WTA  %f\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime, TA, WTA);
             free(runningPCB);
             continue;
         }
         else // Process will be stopped (Will be put back at rear of queue)
         {
-            currentTime += readyProcessesWaitingTime;
             strcpy(processState, stateStrings[STOPPED]);
             fprintf(fptr, "At  time  %d  process  %d  %s  arr  %d  total  %d  remain %d  wait %d\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime);
-            fprintf("At  time  %d  process  %d  %s  arr  %d  total  %d  remain %d  wait %d\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime);
+            runningPCB->state = READY;
+            enqueue(PCBs, runningPCB);
+            continue;
+            //fprintf("At  time  %d  process  %d  %s  arr  %d  total  %d  remain %d  wait %d\n", currentTime, processID, processState, arrivalTime, totalRunningTime, remainingRunningTime, waitingTime);
         }
-
-        // Now need to bring back process at rear of queue
-        runningPCB->state = READY;
-        enqueue(PCBs, runningPCB);
     }
     
     fclose(fptr);
@@ -185,7 +185,7 @@ void terminategenerator(int signum)
 {
     queueopen=0; // indicator that the queue has closed and no more processes will be sent from generator
     destroyClk(false);
-    exit(0);
+    //exit(0);
 }
 
 void updateWaitingTimes(CircularQueue *q, int time) // This is only used on the ready queue
