@@ -46,7 +46,7 @@ enum STATE
     STOPPED   // 5
 };
 
-const char *stateStrings[] = {"READY", "RUNNING", "FINISHED", "STARTED", "RESUMED", "STOPPED"};
+const char *stateStrings[] = {"ready", "running", "finished", "started", "resumed", "stopped"};
 
 typedef struct msgbuff
 {
@@ -151,6 +151,8 @@ void enqueue(CircularQueue *q, PCB *pcb)
     else
     {
         printf("PCB is NULL \n");
+        free(newNode);
+        return;
     }
 }
 
@@ -159,6 +161,7 @@ bool dequeue(CircularQueue *q, PCB **retpcb)
 {
     if (isEmpty(q))
     {
+        *retpcb = NULL;
         return false; // Queue is empty
     }
 
@@ -180,9 +183,16 @@ bool dequeue(CircularQueue *q, PCB **retpcb)
 
 void peak(CircularQueue *q, PCB **retpcb)
 {
+    if (isEmpty(q))
+    {
+        *retpcb = NULL;
+        return;
+    }
     Node *temp = q->rear->next;
     *retpcb = temp->pcb;
 }
+
+
 // Display the elements of the queue
 // void displayQueue(CircularQueue* q) {
 //     if (isEmpty(q)) {
