@@ -164,8 +164,9 @@ int main(int argc, char *argv[])
         PCB* currentpcb;
         dequeue(PCBs,&currentpcb);
         process.pcb.id=currentpcb->id;
+        process.pcb.pid=-1; // -1 means hasn't been forked before
         process.pcb.arrival_time=currentpcb->arrival_time;
-        process.pcb.start_time=-1;
+        process.pcb.start_time=-1; // means hasn't started before
         process.pcb.runtime=currentpcb->runtime;
         process.pcb.remaining_time=currentpcb->runtime;
         process.pcb.waiting_time=0;
@@ -176,7 +177,6 @@ int main(int argc, char *argv[])
         printf("Current Clock Time: %d\n", getClk());
         process.mtype=1;
         send_val=msgsnd(msgq_id,&process,sizeof(process.pcb),!IPC_NOWAIT);
-        printf("Ana ba3at!\n");
         if(send_val==-1)
         {
             printf("Error in sending message\n");

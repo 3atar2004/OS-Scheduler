@@ -1,30 +1,39 @@
 #include "headers.h"
 
 /* Modify this file as needed*/
-int remainingtime;
-int time;
+int remainingTime;
+int currentTime;
+int processID;
+
 void myhandler(int signum)
 {
-    time=getClk();
+    currentTime = getClk();
+    printf("Process %d resumed at time %d\n", processID, currentTime);
 }
 
 int main(int agrc, char *argv[])
 {
-    initClk();
+    initClk(); // Get global clock
     signal(SIGCONT, myhandler);
-    remainingtime=0;
-    time=getClk();
-    //TODO The process needs to get the remaining time from somewhere
+    int runningTime = atoi(argv[1]); // Gets clock as an argument from scheduler
+    int schedulerID = atoi(argv[2]);
+    processID = atoi(argv[3]); // Just for printing and testing flow
+    currentTime = getClk();
+    remainingTime = runningTime;
 
-    while (remainingtime > 0)
+    // Now need to simulate the process running
+    //TODO The process needs to get the remaining time from somewhere
+    printf("Started running process %d\n", processID);
+    while (remainingTime > 0)
     {
-        if(getClk()!=time)
+        if (getClk() != currentTime)
         {
-            remainingtime-=getClk()-time;
-            time=getClk();
+            remainingTime -= getClk() - currentTime;
+            currentTime = getClk();
         }
     }
-    kill(getppid(), SIGUSR1); // send signal to scheduler to that it has finished
+    printf("Finished running process %d for %d seconds\n", processID, runningTime);
+    kill(schedulerID, SIGUSR1); // send signal to scheduler to that it has finished
     destroyClk(false);
 
     return 0;
