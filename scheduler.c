@@ -1,6 +1,8 @@
 #include "headers.h"
 #include <unistd.h>
 #include <signal.h>
+#include <math.h>
+
 int queueopen=1;
 int currentTime = 0;
 int numberOfProcesses = 0;
@@ -11,9 +13,14 @@ int totalRunTime = 0;
 int totalWaitTime = 0;
 float sumTA = 0;
 float sumWTA = 0;
+float WTA_values[100];  // Assume max 100 processes for now
+int finished_index = 0;
+
 
 void terminategenerator(int signum);
 void finishedProcess(int signum);
+void enqueueByRemainingTime(CircularQueue *q, PCB *pcb);
+void peek(CircularQueue *q, PCB **pcb);
 void HPF();
 void SRTN();
 void RR(int quantum);
@@ -76,8 +83,168 @@ void HPF()
 }
 void SRTN()
 {
-    printf("SRTN\n");
+    fptr = fopen("scheduler.log", "w");
+    if (!fptr)
+    {
+        printf("Error opening scheduler.log\n");
+        return;
+    }
+    fprintf(fptr, "#At time x process y state arr w total z remain y wait k\n");
+    fflush(fptr);
+
+    msgbuff msg;
+    PCB *runningProcess = NULL;
+    int lastTime = -1;
+
+    while (!isEmpty(readyQueue) || queueopen == 1 || runningProcess != NULL)
+    {
+        int currentTime = getClk();
+        if (currentTime == lastTime) continue;
+        lastTime = currentTime;
+
+        // Receive new arrivals
+        while (msgrcv(msgq_id, &msg, sizeof(msg) - sizeof(long), 1, IPC_NOWAIT) != -1)
+        {
+            PCB *newPCB = malloc(sizeof(PCB));
+            memcpy(newPCB, &msg.pcb, sizeof(PCB));
+            enqueueByRemainingTime(readyQueue, newPCB);
+            numberOfProcesses++;
+        }
+
+        // Check preemption
+        if (!isEmpty(readyQueue))
+        {
+            PCB *front;
+            peek(readyQueue, &front);
+
+            if (runningProcess == NULL || front->remaining_time < runningProcess->remaining_time)
+            {
+                if (runningProcess != NULL)
+                {
+                    kill(runningProcess->pid, SIGSTOP);
+                    runningProcess->state = STOPPED;
+                    runningProcess->stopped_time = currentTime;
+                    fprintf(fptr, "At time %d process %d stopped arr %d total %d remain %d wait %d\n",
+                            currentTime, runningProcess->id, runningProcess->arrival_time,
+                            runningProcess->runtime, runningProcess->remaining_time,
+                            runningProcess->waiting_time);
+                    fflush(fptr);
+                    enqueueByRemainingTime(readyQueue, runningProcess);
+                }
+
+                dequeue(readyQueue, &runningProcess);
+                if (runningProcess->pid == -1)
+                {
+                    runningProcess->start_time = currentTime;
+                    runningProcess->waiting_time = currentTime - runningProcess->arrival_time;
+                    totalWaitTime += runningProcess->waiting_time;
+
+                    int pid = fork();
+                    if (pid == 0)
+                    {
+                        char runtime_str[5], schedulerID_str[5], id_str[5];
+                        sprintf(runtime_str, "%d", runningProcess->runtime);
+                        sprintf(schedulerID_str, "%d", getppid());
+                        sprintf(id_str, "%d", runningProcess->id);
+                        execl("./process.out", "process.out", runtime_str, schedulerID_str, id_str, NULL);
+                        exit(1);
+                    }
+                    else
+                    {
+                        runningProcess->pid = pid;
+                        runningProcess->state = STARTED;
+                        fprintf(fptr, "At time %d process %d started arr %d total %d remain %d wait %d\n",
+                                currentTime, runningProcess->id, runningProcess->arrival_time,
+                                runningProcess->runtime, runningProcess->remaining_time,
+                                runningProcess->waiting_time);
+                        fflush(fptr);
+                    }
+                }
+                else
+                {
+                    runningProcess->state = RESUMED;
+                    runningProcess->waiting_time += currentTime - runningProcess->stopped_time;
+                    totalWaitTime += currentTime - runningProcess->stopped_time;
+                    kill(runningProcess->pid, SIGCONT);
+                    fprintf(fptr, "At time %d process %d resumed arr %d total %d remain %d wait %d\n",
+                            currentTime, runningProcess->id, runningProcess->arrival_time,
+                            runningProcess->runtime, runningProcess->remaining_time,
+                            runningProcess->waiting_time);
+                    fflush(fptr);
+                }
+            }
+        }
+
+        if (runningProcess != NULL)
+        {
+            runningProcess->remaining_time--;
+            totalRunTime++;
+            if (runningProcess->remaining_time == 0)
+            {
+                runningProcess->finished_time = getClk() + 1;
+                int TA = runningProcess->finished_time - runningProcess->arrival_time;
+                float WTA = (float)TA / runningProcess->runtime;
+
+                sumTA += TA;
+                sumWTA += WTA;
+                WTA_values[finished_index++] = WTA;
+
+                runningProcess->state = FINISHED;
+                fprintf(fptr, "At time %d process %d finished arr %d total %d remain 0 wait %d TA %d WTA %.2f\n",
+                        runningProcess->finished_time, runningProcess->id,
+                        runningProcess->arrival_time, runningProcess->runtime,
+                        runningProcess->waiting_time, TA, WTA);
+                fflush(fptr);
+                runningProcess = NULL;
+            }
+        }
+    }
+
+    // CALCULATE PERFORMANCE METRICS
+    int finishTime = getClk();
+    float cpu_util = ((float)totalRunTime / finishTime) * 100.0;
+    avgWaiting = (float)totalWaitTime / numberOfProcesses;
+    avgWTA = sumWTA / numberOfProcesses;
+
+    // Replace 'pow' with simple multiplication for squaring
+    float sumSqDiff = 0;
+    for (int i = 0; i < finished_index; ++i)
+    {
+        sumSqDiff += (WTA_values[i] - avgWTA) * (WTA_values[i] - avgWTA);  // Squaring directly
+    }
+
+    // Now, calculate the square root without sqrt()
+    float stdWTA = 0;
+    float guess = sumSqDiff / numberOfProcesses;  // Start with an initial guess
+    float tolerance = 0.00001;  // Set a tolerance value for convergence
+    while (1) {
+        float next_guess = 0.5 * (guess + (sumSqDiff / numberOfProcesses) / guess);
+        if (abs(guess - next_guess) < tolerance) {
+            break;
+        }
+        guess = next_guess;
+    }
+    stdWTA = guess;
+
+
+    // WRITE TO PERF FILE
+    FILE *perf = fopen("scheduler.perf", "w");
+    if (perf)
+    {
+        fprintf(perf, "CPU utilization = %.2f%%\n", cpu_util);
+        fprintf(perf, "Avg WTA = %.2f\n", avgWTA);
+        fprintf(perf, "Avg Waiting = %.2f\n", avgWaiting);
+        fprintf(perf, "Std WTA = %.2f\n", stdWTA);
+        fclose(perf);
+    }
+    else
+    {
+        printf("Error opening scheduler.perf\n");
+    }
+
+    fclose(fptr);
 }
+
 void RR(int quantum)
 {
     fptr = fopen("scheduler.log", "w");
@@ -251,4 +418,39 @@ void updateWaitingTimes(CircularQueue *q, int time) // This is only used on the 
         current = current->next;
     }
 
+}
+
+void enqueueByRemainingTime(CircularQueue *q, PCB *pcb) {
+    Node *newNode = (Node *)malloc(sizeof(Node));
+    newNode->pcb = pcb;
+
+    if (q->rear == NULL) {
+        newNode->next = newNode;
+        q->rear = newNode;
+        return;
+    }
+
+    Node *current = q->rear->next;
+    Node *prev = q->rear;
+    do {
+        if (pcb->remaining_time < current->pcb->remaining_time) break;
+        prev = current;
+        current = current->next;
+    } while (current != q->rear->next);
+
+    newNode->next = current;
+    prev->next = newNode;
+
+    // If inserted at the end, update rear
+    if (prev == q->rear && pcb->remaining_time >= current->pcb->remaining_time) {
+        q->rear = newNode;
+    }
+}
+
+void peek(CircularQueue *q, PCB **pcb) {
+    if (q->rear == NULL) {
+        *pcb = NULL;
+        return;
+    }
+    *pcb = q->rear->next->pcb;
 }
