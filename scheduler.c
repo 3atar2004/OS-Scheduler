@@ -78,8 +78,127 @@ int main(int argc, char *argv[])
     return(0);
 }
 void HPF()
-{
-    printf("Non Preemptive HPF\n");
+{    
+    PriorityQueue *readyQueue = createQueue(); // Priority queue for processes
+    PriorityQueue *WaitingQueue = createQueue();
+    PCB *current_process = NULL;
+    FILE *logfile = fopen("scheduler.log", "w");
+    msgbuff receivedPCBbuff;
+    int msgq_id;
+    int totalWaitTime = 0, totalTurnaroundTime = 0, totalProcesses = 0, status;
+    float WTA_sum = 0, WTA = 0;
+    float runtime_sum = 0;
+    key_t msg_id = ftok("msgqueue", 65);
+    msgq_id = msgget(msg_id, 0666 | IPC_CREAT);
+    if (msgq_id == -1)
+    {
+        perror("Error while creating the message queue for HPF");
+        exit(-1);
+    }
+
+    // status = msgrcv(msgq_id, &receivedPCBbuff, sizeof(receivedPCBbuff) - sizeof(long), 1, !IPC_NOWAIT); // Scheduler won't start untill first process received
+    // while (status != -1) // The first process has arrvied
+    // {
+    //     PCB *arrivedPCB = malloc(sizeof(PCB));
+    //     memcpy(arrivedPCB, &receivedPCBbuff.pcb, sizeof(PCB));
+    //     enqueuePri(readyQueue, arrivedPCB, arrivedPCB->priority);
+    //     printf("Scheduler received process %d at time %d with runtime %d and priority %d \n", arrivedPCB->id, getClk(), arrivedPCB->runtime, arrivedPCB->priority);
+    //     totalProcesses++;
+    // }
+    // Initialize the clock and get the starting time
+    int clockTime = getClk();
+
+    fprintf(logfile, "#At time x process y state arr w total z remain y wait k\n");
+
+    while (!isPriEmpty(readyQueue) || current_process != NULL || queueopen==1)
+    {
+        // Check for new processes in the message queue
+        status = msgrcv(msgq_id, &receivedPCBbuff, sizeof(receivedPCBbuff) - sizeof(long), 1, IPC_NOWAIT); // Check for new arrivals from generator
+        while (status != -1) // No new arrivals
+        {
+            // New arrivals are in queue
+            PCB *arrivedPCB = malloc(sizeof(PCB));
+            memcpy(arrivedPCB, &receivedPCBbuff.pcb, sizeof(PCB));
+            enqueuePri(readyQueue, arrivedPCB, arrivedPCB->priority);
+            printf("Scheduler received process %d at time %d with runtime %d and priority %d \n", arrivedPCB->id, getClk(), arrivedPCB->runtime, arrivedPCB->priority);
+            totalProcesses++;
+            status = msgrcv(msgq_id, &receivedPCBbuff, sizeof(receivedPCBbuff) - sizeof(long), 1, IPC_NOWAIT); // Check for new arrivals from generator
+
+        }
+
+        // Handle the currently running process
+        if (current_process)
+        {
+            if ((current_process->remaining_time) == 1)
+            {
+                // Process finished
+                fprintf(logfile, "At time %d process %d finished arr %d total %d remain 0 wait %d TA %d WTA %.2f\n",
+                        getClk()-1, current_process->id, current_process->arrival_time, current_process->runtime,
+                        current_process->waiting_time, clockTime - current_process->arrival_time,
+                        (float)(clockTime - current_process->arrival_time) / current_process->runtime);
+
+                totalWaitTime += current_process->waiting_time;
+                totalTurnaroundTime += getClk() - current_process->arrival_time;
+                WTA_sum += (float)(getClk() - current_process->arrival_time) / current_process->runtime;
+                totalProcesses++;
+
+                free(current_process);
+                current_process = NULL;
+                
+                // Check waiting queue for processes that can now fit in memory
+            }
+            else
+            {
+                // In non-preemptive, we just decrement remaining time
+                current_process->remaining_time--;
+            }
+        }
+
+        // Start a new process if none is running
+        if (!current_process && !isPriEmpty(readyQueue))
+        {
+            dequeuePri(readyQueue, &current_process);
+            
+         
+                // Start a new process
+                current_process->remaining_time = current_process->runtime;
+                runtime_sum += current_process->runtime;
+                current_process->waiting_time += (getClk() - current_process->arrival_time);                
+                current_process->pid = fork();
+                if (current_process->pid == 0)
+                {
+                    while (1)
+                        pause(); // Waiting for SIGCONT
+                }
+                
+                fprintf(logfile, "At time %d process %d started arr %d total %d remain %d wait %d\n",
+                        getClk(), current_process->id, current_process->arrival_time, current_process->runtime,
+                        current_process->remaining_time, current_process->waiting_time);
+           
+        }
+
+        // Advance the clock
+        while (getClk() < clockTime)
+            ;
+            clockTime++;
+
+    }
+
+    // Log performance metrics
+    float cpu_utilization = (runtime_sum / (getClk() - 1)) * 100;
+    float avgWTA = WTA_sum / totalProcesses;
+    float avgWaiting = (float)totalWaitTime / totalProcesses;
+    FILE *perf;
+    perf = fopen("scheduler.perf", "w");
+    fprintf(perf, "CPU utilization = %.2f %% \n", cpu_utilization);
+    fprintf(perf, "Avg WTA = %.2f \n", avgWTA);
+    fprintf(perf, "Avg Waiting = %.2f \n", avgWaiting);
+    fclose(perf);
+    fclose(logfile);
+
+    freePriQueue(readyQueue);
+    freePriQueue(WaitingQueue);
+    destroyClk(true);
 }
 void SRTN()
 {
