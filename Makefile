@@ -1,8 +1,10 @@
+# Makefile
+
 build:
 	gcc process_generator.c -o process_generator.out
 	gcc clk.c -o clk.out
-	gcc scheduler.c -o scheduler.out
-	gcc process.c -o process.out
+	gcc scheduler.c -o scheduler.out -lm
+	gcc process.c -o process.out -lm
 	gcc test_generator.c -o test_generator.out
 
 clean:
@@ -10,5 +12,5 @@ clean:
 
 all: clean build
 
-run:
+run: build
 	./process_generator.out processes.txt
