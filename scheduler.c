@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
     // TODO: implement the scheduler.
     // TODO: upon termination release the clock resources.
 
-    destroyClk(true);
+    destroyClk(false);
     return (0);
 }
 void HPF()
@@ -140,6 +140,8 @@ void HPF()
                 totalWaitTime += current_process->waiting_time;
                 totalTurnaroundTime += getClk() - current_process->arrival_time;
                 WTA_sum += (float)(getClk() - current_process->arrival_time) / current_process->runtime;
+                WTA_values[finished_index++] = (float)(getClk() - current_process->arrival_time) / current_process->runtime;
+                
                 totalProcesses++;
 
                 free(current_process);
@@ -189,12 +191,12 @@ void HPF()
     fprintf(perf, "CPU utilization = %.2f %% \n", cpu_utilization);
     fprintf(perf, "Avg WTA = %.2f \n", avgWTA);
     fprintf(perf, "Avg Waiting = %.2f \n", avgWaiting);
+    fprintf(perf, "Std WTA = %.2f \n", calculateStdWTA(WTA_values, finished_index + 1, avgWTA));
     fclose(perf);
     fclose(logfile);
 
     freePriQueue(readyQueue);
     freePriQueue(WaitingQueue);
-    destroyClk(true);
 }
 void SRTN()
 {
@@ -496,7 +498,6 @@ void RR(int quantum)
     fprintf(perf, "Std WTA = %.2f \n", stdWTA);
     fclose(perf);
     freeQueue(readyQueue);
-    destroyClk(true);
 }
 
 void finishedProcess(int signum)
