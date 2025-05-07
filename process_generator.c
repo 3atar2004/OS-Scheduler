@@ -172,7 +172,8 @@ int main(int argc, char *argv[])
         process.pcb.waiting_time = 0;
         process.pcb.priority = currentpcb->priority;
         process.pcb.state = READY;
-        while (getClk() < currentpcb->arrival_time);
+        while (getClk() < currentpcb->arrival_time)
+            ;
         printf("Sending process %d with arrival time %d and runtime %d and priority %d at time %d\n", process.pcb.id, process.pcb.arrival_time, process.pcb.runtime, process.pcb.priority, getClk());
         printf("Current Clock Time: %d\n", getClk());
         process.mtype = 1;
