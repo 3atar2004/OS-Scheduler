@@ -29,12 +29,19 @@ void receiveNewProcessesNonBlocking();
 int msgq_id;
 CircularQueue *readyQueue;
 FILE *fptr;
-
+BuddyMemory*memory;
 int main(int argc, char *argv[])
 {
     initClk();
     signal(SIGUSR1, finishedProcess);
     signal(SIGUSR2, terminategenerator);
+    memory=malloc(sizeof(BuddyMemory));
+    memory->memsize=1024;
+    memory->start=0;
+    memory->is_free=true;
+    memory->pcbID=-1;
+    memory->left=NULL;
+    memory->right=NULL;
     int compileprocess = system("gcc process.c -o process.out");
     if (compileprocess != 0)
     {
@@ -50,27 +57,27 @@ int main(int argc, char *argv[])
     readyQueue = (CircularQueue *)malloc(sizeof(CircularQueue));
     initQueue(readyQueue);
 
-    // while(queueopen)
-    // {
-    //     msgbuff msg;
-    //     int rec_val=msgrcv(msgq_id, &msg, sizeof(msg) - sizeof(long), 1, !IPC_NOWAIT);
-    //     printf("Recieved process %d at time %d and runtime %d and priority %d\n",msg.pcb.id,getClk(),msg.pcb.runtime,msg.pcb.priority);
-    // }
-
-    switch (chosenAlgorithm) // 1- Non Preemptive HPF, 2- SRTN, 3- RR
+    while(queueopen)
     {
-    case 1:
-        HPF();
-        break;
-    case 2:
-        SRTN();
-        break;
-    case 3:
-        RR(quantum);
-        break;
-    default:
-        break;
+        msgbuff msg;
+        int rec_val=msgrcv(msgq_id, &msg, sizeof(msg) - sizeof(long), 1, !IPC_NOWAIT);
+        printf("Recieved process %d at time %d and runtime %d and priority %d and memory size  %d\n",msg.pcb.id,getClk(),msg.pcb.runtime,msg.pcb.priority,msg.pcb.memorysize);
     }
+
+    // switch (chosenAlgorithm) // 1- Non Preemptive HPF, 2- SRTN, 3- RR
+    // {
+    // case 1:
+    //     HPF();
+    //     break;
+    // case 2:
+    //     SRTN();
+    //     break;
+    // case 3:
+    //     RR(quantum);
+    //     break;
+    // default:
+    //     break;
+    // }
 
     // TODO: implement the scheduler.
     // TODO: upon termination release the clock resources.

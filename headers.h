@@ -18,7 +18,15 @@ typedef short bool;
 #define false 0
 
 #define SHKEY 300
-
+typedef struct BuddyMemory
+{
+    int memsize;
+    int start;
+    bool is_free;
+    int pcbID;
+    struct BuddyMemory *left;
+    struct BuddyMemory *right;
+} BuddyMemory;
 typedef struct PCB
 {
     int id; // read from file
@@ -34,6 +42,9 @@ typedef struct PCB
     int stopped_time;
     int restarted_time;
     int remainingTimeAfterStop;
+    int memorysize;
+    int startaddress;
+    int endaddress;
 } PCB;
 
 enum STATE
@@ -327,3 +338,141 @@ void freePriQueue(PriorityQueue *pq)
 //     } while(current != q->rear->next);
 // }
 
+// memory management part
+#define TotalMemorySize 1024
+#define minMemorySize 1
+#define maxMemorySize 512
+
+BuddyMemory * createNode(int start,int size)
+{
+    BuddyMemory * node=(BuddyMemory *)malloc(sizeof(BuddyMemory));
+    node->memsize=size;
+    node->start=start;
+    node->is_free=true;
+    node->pcbID=-1;
+    node->left=node->right=NULL;
+    return node;
+}
+BuddyMemory* initialise()
+{
+    return createNode(0,TotalMemorySize);
+}
+int getnextpowerof2(int x)
+{
+    int power=1;
+    while(power<x)
+    {
+        power*=2;
+    }  
+    return power;
+}
+bool allocatememory(BuddyMemory *node, PCB *pcb)
+{
+    if (!node || !pcb)
+        return false;
+
+    int requestedsize = pcb->memorysize;
+    int requiredBlockSize = getnextpowerof2(requestedsize);
+
+    // Can't allocate if already taken or block is too small
+    if (!node->is_free || node->memsize < requiredBlockSize)
+        return false;
+
+    // Leaf node and exactly fits — allocate
+    if (node->memsize == requiredBlockSize && node->left == NULL && node->right == NULL)
+    {
+        node->is_free = false;
+        node->pcbID = pcb->id;
+        pcb->startaddress = node->start;
+        pcb->endaddress = node->start + node->memsize - 1;
+        return true;
+    }
+
+    // Split if not already split
+    if (node->left == NULL && node->right == NULL)
+    {
+        int halfSize = node->memsize / 2;
+        if (halfSize < minMemorySize)
+            return false; // can't split further
+
+        node->left = createNode(node->start, halfSize);
+        node->right = createNode(node->start + halfSize, halfSize);
+    }
+
+    // Recurse: try left first
+    if (allocatememory(node->left, pcb))
+        return true;
+
+    // Then try right
+    if (allocatememory(node->right, pcb))
+        return true;
+
+    return false;
+}
+
+int deallocatememory(BuddyMemory *node, int startaddress)
+{
+    if(!node )return 0;
+    if(node->left==NULL && node->right==NULL)
+    {
+        if(node->start==startaddress && node->is_free==false)
+        {
+            node->is_free=true;
+            node->pcbID=-1;
+            return 1;
+        }
+        return 0;
+    }
+    int leftfree=deallocatememory(node->left,startaddress);
+    int rightfree=deallocatememory(node->right,startaddress);
+    if(leftfree || rightfree)
+    {
+        if(node->left->is_free && node->right->is_free)
+        {
+            free(node->left);
+            free(node->right);
+            node->left=NULL;
+            node->right=NULL;
+            node->is_free=true;
+            node->pcbID=-1;
+        }
+        return 1;
+    }
+    return 0;
+}
+void displayTree(BuddyMemory *head, int depth, const char *position)
+{
+    if (!head)
+    {
+        return;
+    }
+
+    // Indent based on depth to visualize tree levels
+    for (int i = 0; i < depth; i++)
+    {
+        printf("  ");
+    }
+
+    // Display whether the block is "Left" or "Right" or "Root"
+    if (position)
+    {
+        printf("[%s] ", position);
+    }
+
+    // Print information about the block
+    printf("Block: Start=%d, Size=%d, Free=%s",
+           head->start, head->memsize, head->is_free ? "Yes" : "No");
+
+    // If allocated, display the PCB ID and memory range
+    if (!head->is_free && head->pcbID != -1)
+    {
+        printf(", Allocated to PCB ID=%d (Start=%d, End=%d)",
+               head->pcbID, head->start, head->start + head->memsize - 1);
+    }
+
+    printf("\n");
+
+    // Recursively display left and right children
+    displayTree(head->left, depth + 1, "Left");
+    displayTree(head->right, depth + 1, "Right");
+}

@@ -22,20 +22,22 @@ int main(int argc, char *argv[])
         printf("Error opening file\n");
         exit(1);
     }
-    int id, arrival, runtime, priority;
+    int id, arrival, runtime, priority,memsize;
     fscanf(pFile, "%*[^\n]\n");
     printf("----------------------------------Processes--------------------------------------\n");
-    printf("\t\tID\t   Arrival Time\t   Running Time\t    Priority\n");
+    printf("\t\tID\t   Arrival Time\t   Running Time\t    Priority\t  Memory Size\n");
+    printf("----------------------------------------------------------------------------------\n");
     int count = 1;
-    while (fscanf(pFile, "%d\t%d\t%d\t%d\n", &id, &arrival, &runtime, &priority) == 4)
+    while (fscanf(pFile, "%d\t%d\t%d\t%d\t%d\n", &id, &arrival, &runtime, &priority,&memsize) == 5)
     {
         printf("Process %d:\t", count);
-        printf("%d\t\t%d\t\t%d\t\t%d\n", id, arrival, runtime, priority);
+        printf("%d\t\t%d\t\t%d\t\t%d\t %d\n", id, arrival, runtime, priority,memsize);
         PCB *readpcb = malloc(sizeof(PCB));
         readpcb->id = id;
         readpcb->arrival_time = arrival;
         readpcb->runtime = runtime;
         readpcb->priority = priority;
+        readpcb->memorysize=memsize;
         enqueue(PCBs, readpcb);
         count++;
     }
@@ -102,11 +104,14 @@ int main(int argc, char *argv[])
         perror("Error forking scheduler!");
         exit(1);
     }
+    //printf("hi");
     if (schedulerid == 0)
     {
+        //printf("hi");
         int compilestatus = system("gcc scheduler.c -o scheduler.out");
         if (compilestatus == 0)
         {
+            
             printf("Scheduler process started!\n");
             execl("./scheduler.out", "scheduler.out", chosenAlgorithm_str, quantum_str, NULL); // runing the scheduler with chosen algorithm and quantum
             printf("Error executing scheduler!");
@@ -172,15 +177,21 @@ int main(int argc, char *argv[])
         process.pcb.waiting_time = 0;
         process.pcb.priority = currentpcb->priority;
         process.pcb.state = READY;
+        process.pcb.memorysize=currentpcb->memorysize;
         while (getClk() < currentpcb->arrival_time)
             ;
-        printf("Sending process %d with arrival time %d and runtime %d and priority %d at time %d\n", process.pcb.id, process.pcb.arrival_time, process.pcb.runtime, process.pcb.priority, getClk());
-        printf("Current Clock Time: %d\n", getClk());
+            printf("Current Clock Time: %d\n", getClk());
+
+        printf("Sending process %d with arrival time %d and runtime %d and priority %d and memory size %d at time %d \n", process.pcb.id, process.pcb.arrival_time, process.pcb.runtime, process.pcb.priority,process.pcb.memorysize, getClk());
         process.mtype = 1;
         send_val = msgsnd(msgq_id, &process, sizeof(process.pcb), !IPC_NOWAIT);
         if (send_val == -1)
         {
             printf("Error in sending message\n");
+        }
+        else
+        {
+            printf("Process %d sent successfully\n", process.pcb.id);
         }
         free(currentpcb);
     }
