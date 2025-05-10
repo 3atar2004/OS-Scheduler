@@ -57,13 +57,6 @@ int main(int argc, char *argv[])
     readyQueue = (CircularQueue *)malloc(sizeof(CircularQueue));
     initQueue(readyQueue);
 
-    // while(queueopen)
-    // {
-    //     msgbuff msg;
-    //     int rec_val=msgrcv(msgq_id, &msg, sizeof(msg) - sizeof(long), 1, !IPC_NOWAIT);
-    //     printf("Recieved process %d at time %d and runtime %d and priority %d and memory size  %d\n",msg.pcb.id,getClk(),msg.pcb.runtime,msg.pcb.priority,msg.pcb.memorysize);
-    // }
-
     switch (chosenAlgorithm) // 1- Non Preemptive HPF, 2- SRTN, 3- RR
     {
     case 1:
@@ -78,9 +71,6 @@ int main(int argc, char *argv[])
     default:
         break;
     }
-
-    // TODO: implement the scheduler.
-    // TODO: upon termination release the clock resources.
 
     destroyClk(false);
     return (0);
@@ -251,19 +241,20 @@ void SRTN()
     fprintf(fptr, "#At time x process y state arr w total z remain y wait k\n");
     fflush(fptr);
 
-    msgbuff msg;
+    FILE *memoryLog = fopen("memory.log", "w");
+    if (!memoryLog)
+    {
+        printf("Error opening memory.log\n");
+        fclose(fptr);
+        return;
+    }
+    fprintf(memoryLog, "#At time x allocated y bytes for process z from i to j\n");
+    fflush(memoryLog);
+
     PCB *runningProcess = NULL;
     int lastTime = -1;
 
-    if (msgrcv(msgq_id, &msg, sizeof(msg) - sizeof(long), 1, 0) != -1)
-    {
-        PCB *newPCB = malloc(sizeof(PCB));
-        memcpy(newPCB, &msg.pcb, sizeof(PCB));
-        enqueueByRemainingTime(readyQueue, newPCB);
-        numberOfProcesses++;
-    }
-
-    while (!isEmpty(readyQueue) || queueopen == 1 || runningProcess != NULL)
+    while (!isEmpty(readyQueue) || queueopen || runningProcess != NULL)
     {
         int currentTime = getClk();
         if (currentTime == lastTime)
@@ -271,15 +262,9 @@ void SRTN()
         lastTime = currentTime;
 
         // Receive new arrivals
-        while (msgrcv(msgq_id, &msg, sizeof(msg) - sizeof(long), 1, IPC_NOWAIT) != -1)
-        {
-            PCB *newPCB = malloc(sizeof(PCB));
-            memcpy(newPCB, &msg.pcb, sizeof(PCB));
-            enqueueByRemainingTime(readyQueue, newPCB);
-            numberOfProcesses++;
-        }
+        receiveNewProcessesNonBlocking();
 
-        // Check preemption
+        // Check for preemption
         if (!isEmpty(readyQueue))
         {
             PCB *front;
@@ -303,6 +288,20 @@ void SRTN()
                 dequeue(readyQueue, &runningProcess);
                 if (runningProcess->pid == -1)
                 {
+                    // Allocate memory for the process
+                    if (!allocatememory(memory, runningProcess))
+                    {
+                        printf("Memory allocation failed for process %d\n", runningProcess->id);
+                        enqueueByRemainingTime(readyQueue, runningProcess);
+                        runningProcess = NULL;
+                        continue;
+                    }
+
+                    fprintf(memoryLog, "At time %d allocated %d bytes for process %d from %d to %d\n",
+                            currentTime, runningProcess->memorysize, runningProcess->id,
+                            runningProcess->startaddress, runningProcess->endaddress);
+                    fflush(memoryLog);
+
                     runningProcess->start_time = currentTime;
                     runningProcess->waiting_time = currentTime - runningProcess->arrival_time;
                     totalWaitTime += runningProcess->waiting_time;
@@ -349,7 +348,7 @@ void SRTN()
             totalRunTime++;
             if (runningProcess->remaining_time == 0)
             {
-                runningProcess->finished_time = getClk() + 1;
+                runningProcess->finished_time = getClk();
                 int TA = runningProcess->finished_time - runningProcess->arrival_time;
                 float WTA = (float)TA / runningProcess->runtime;
 
@@ -363,6 +362,15 @@ void SRTN()
                         runningProcess->arrival_time, runningProcess->runtime,
                         runningProcess->waiting_time, TA, WTA);
                 fflush(fptr);
+
+                // Free memory for the process
+                deallocatememory(memory, runningProcess->startaddress);
+                fprintf(memoryLog, "At time %d freed %d bytes from process %d from %d to %d\n",
+                        runningProcess->finished_time, runningProcess->memorysize, runningProcess->id,
+                        runningProcess->startaddress, runningProcess->endaddress);
+                fflush(memoryLog);
+
+                free(runningProcess);
                 runningProcess = NULL;
             }
         }
@@ -374,27 +382,8 @@ void SRTN()
     avgWaiting = (float)totalWaitTime / numberOfProcesses;
     avgWTA = sumWTA / numberOfProcesses;
 
-    // Replace 'pow' with simple multiplication for squaring
-    float sumSqDiff = 0;
-    for (int i = 0; i < finished_index; ++i)
-    {
-        sumSqDiff += (WTA_values[i] - avgWTA) * (WTA_values[i] - avgWTA); // Squaring directly
-    }
-
-    // Now, calculate the square root without sqrt()
-    float stdWTA = 0;
-    float guess = sumSqDiff / numberOfProcesses; // Start with an initial guess
-    float tolerance = 0.00001;                   // Set a tolerance value for convergence
-    while (1)
-    {
-        float next_guess = 0.5 * (guess + (sumSqDiff / numberOfProcesses) / guess);
-        if (abs(guess - next_guess) < tolerance)
-        {
-            break;
-        }
-        guess = next_guess;
-    }
-    stdWTA = guess;
+    // Calculate standard deviation of WTA using the provided function
+    stdWTA = calculateStdWTA(WTA_values, numberOfProcesses, avgWTA);
 
     // WRITE TO PERF FILE
     FILE *perf = fopen("scheduler.perf", "w");
@@ -412,6 +401,7 @@ void SRTN()
     }
 
     fclose(fptr);
+    fclose(memoryLog);
 }
 
 void RR(int quantum)
