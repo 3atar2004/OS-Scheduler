@@ -29,6 +29,7 @@ void receiveNewProcessesNonBlocking();
 int msgq_id;
 CircularQueue *readyQueue;
 FILE *fptr;
+FILE *mptr;
 BuddyMemory *memory;
 int main(int argc, char *argv[])
 {
@@ -56,6 +57,7 @@ int main(int argc, char *argv[])
 
     readyQueue = (CircularQueue *)malloc(sizeof(CircularQueue));
     initQueue(readyQueue);
+
 
     switch (chosenAlgorithm) // 1- Non Preemptive HPF, 2- SRTN, 3- RR
     {
@@ -412,6 +414,13 @@ void RR(int quantum)
         printf("Error opening scheduler.log\n");
         return;
     }
+    mptr = fopen("memory.log", "w");
+    if (!mptr)
+    {
+        printf("Error opening memory.log\n");
+        return;
+    }
+
     fprintf(fptr, "#At  time  x  process  y  state  arr  w  total  z  remain  y  wait  k\n");
     fflush(fptr);
 
@@ -447,6 +456,14 @@ void RR(int quantum)
             dequeue(readyQueue, &runningProcess);
             if (runningProcess->pid == -1)
             {
+                // Allocate memory for the process
+                if (!allocatememory(memory, runningProcess))
+                {
+                    printf("Memory allocation failed for process %d !\n", runningProcess->id);
+                    enqueue(readyQueue, runningProcess);
+                    runningProcess = NULL;
+                    continue;
+                }
                 runningProcess->pid = fork();
                 if (runningProcess->pid == 0)
                 {
@@ -465,6 +482,8 @@ void RR(int quantum)
                 totalRunTime += runningProcess->runtime; // Update total run time
                 fprintf(fptr, "At time %d process %d %s arr %d total %d remain %d wait %d\n", currentTime, runningProcess->id, stateString, runningProcess->arrival_time, runningProcess->runtime, runningProcess->remaining_time, runningProcess->waiting_time);
                 fflush(fptr);
+                fprintf(mptr, "At time %d allocated %d bytes for process %d from %d to %d\n", currentTime, runningProcess->memorysize, runningProcess->id, runningProcess->startaddress, runningProcess->endaddress);
+                fflush(mptr);
             }
             else
             {
@@ -500,6 +519,9 @@ void RR(int quantum)
                 sumWTA += WTA;
                 fprintf(fptr, "At time %d process %d %s arr %d total %d remain %d wait %d TA %d WTA %.2f\n", getClk() + 1, runningProcess->id, stateString, runningProcess->arrival_time, runningProcess->runtime, runningProcess->remaining_time, runningProcess->waiting_time, TA, WTA);
                 fflush(fptr);
+                deallocatememory(memory, runningProcess->startaddress);
+                fprintf(mptr, "At time %d freed %d bytes from process %d from %d to %d\n", getClk() + 1, runningProcess->memorysize, runningProcess->id, runningProcess->startaddress, runningProcess->endaddress);
+                fflush(mptr);
                 runningProcess = NULL;
             }
         }
