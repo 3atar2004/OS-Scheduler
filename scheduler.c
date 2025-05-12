@@ -14,6 +14,8 @@ float sumTA = 0;
 float sumWTA = 0;
 float WTA_values[100]; // Assume max 100 processes for now
 int finished_index = 0;
+int process_finished_flag = 0;
+int finished_process_pid=-1;
 
 void terminategenerator(int signum);
 void finishedProcess(int signum);
@@ -77,143 +79,178 @@ int main(int argc, char *argv[])
     destroyClk(false);
     return (0);
 }
-void HPF()
-{
-    PriorityQueue *readyQueue = createQueue();
-    PriorityQueue *waitingQueue = createQueue();
+void HPF() {
+    PriorityQueue *readyqueue = createQueue();
+    PriorityQueue *waitingQueue = createQueue(); 
     PCB *current_process = NULL;
     FILE *logfile = fopen("scheduler.log", "w");
-    if (!logfile)
-    {
+    if (!logfile) {
         perror("Error opening scheduler.log");
+        exit(-1);
+    }
+    FILE *memfile = fopen("memory.log", "w");
+    if (!memfile) {
+        perror("Error opening memory.log");
         exit(-1);
     }
 
     msgbuff receivedPCBbuff;
-    int msgq_id;
     int totalWaitTime = 0, totalTurnaroundTime = 0, totalProcesses = 0;
     float WTA_sum = 0, runtime_sum = 0;
-    key_t msg_id = ftok("msgqueue", 65);
-    if (msg_id == -1)
-    {
-        perror("Error generating message queue key");
-        fclose(logfile);
-        exit(-1);
-    }
-
-    msgq_id = msgget(msg_id, 0666 | IPC_CREAT);
-    if (msgq_id == -1)
-    {
-        perror("Error creating message queue for HPF");
-        fclose(logfile);
-        exit(-1);
-    }
 
     fprintf(logfile, "#At time x process y state arr w total z remain y wait k\n");
 
     int clockTime = getClk();
-    int done = 0; // Flag 3ashan a3raf fi processes expected tany wala la
+    int done = 0;
 
-    while (!done || !isPriEmpty(readyQueue) || current_process != NULL)
-    {
-        // Check for new processes fel queue
-        while (msgrcv(msgq_id, &receivedPCBbuff, sizeof(receivedPCBbuff) - sizeof(long), 1, IPC_NOWAIT) != -1)
-        {
+    // Receive initial processes
+    while (msgrcv(msgq_id, &receivedPCBbuff, sizeof(receivedPCBbuff) - sizeof(long), 1, IPC_NOWAIT) != -1) {
+        printf("Received initial process\n");
+        PCB *arrivedPCB = malloc(sizeof(PCB));
+        if (!arrivedPCB) {
+            perror("Error allocating memory for PCB");
+            continue;
+        }
+        memcpy(arrivedPCB, &receivedPCBbuff.pcb, sizeof(PCB));
+        arrivedPCB->waiting_time = 0;
+        arrivedPCB->remaining_time = arrivedPCB->runtime;
+        arrivedPCB->pid = -1;
+        // Add to waiting queue to respect arrival time
+        enqueuePri(waitingQueue, arrivedPCB, arrivedPCB->priority);
+        printf("Scheduler received process %d at time %d with runtime %d and priority %d\n",
+               arrivedPCB->id, getClk(), arrivedPCB->runtime, arrivedPCB->priority);
+        totalProcesses++;
+    }
+
+    while (!done || !isPriEmpty(readyqueue) || !isPriEmpty(waitingQueue) || current_process != NULL) {
+        int currentTime = getClk();
+
+        // Check for new processes
+        while (msgrcv(msgq_id, &receivedPCBbuff, sizeof(receivedPCBbuff) - sizeof(long), 1, IPC_NOWAIT) != -1) {
             PCB *arrivedPCB = malloc(sizeof(PCB));
-            if (!arrivedPCB)
-            {
+            if (!arrivedPCB) {
                 perror("Error allocating memory for PCB");
                 continue;
             }
             memcpy(arrivedPCB, &receivedPCBbuff.pcb, sizeof(PCB));
             arrivedPCB->waiting_time = 0;
             arrivedPCB->remaining_time = arrivedPCB->runtime;
-            enqueuePri(readyQueue, arrivedPCB, arrivedPCB->priority);
+            arrivedPCB->pid = -1;
+            enqueuePri(waitingQueue, arrivedPCB, arrivedPCB->priority);
             printf("Scheduler received process %d at time %d with runtime %d and priority %d\n",
                    arrivedPCB->id, getClk(), arrivedPCB->runtime, arrivedPCB->priority);
             totalProcesses++;
         }
 
-        // Handle the currently running process
-        if (current_process)
-        {
-            if (current_process->remaining_time <= 0)
-            {
-                // Process finished
+        // Move processes from waiting queue to ready queue based on arrival time
+        while (!isPriEmpty(waitingQueue)) {
+            PCB *waitingProcess;
+            if (dequeuePri(waitingQueue, &waitingProcess)) {
+                if (waitingProcess->arrival_time <= currentTime) {
+                    enqueuePri(readyqueue, waitingProcess, waitingProcess->priority);
+                    printf("Process %d moved to ready queue at time %d\n", waitingProcess->id, currentTime);
+                } else {
+                    enqueuePri(waitingQueue, waitingProcess, waitingProcess->priority);
+                    break;
+                }
+            }
+        }
+
+        // Check if current process has finished
+        if (current_process) {
+            printf("Checking if process %d (pid=%d) finished at time %d\n", current_process->id, current_process->pid, currentTime);
+            // Check via signal handler flag
+            if (process_finished_flag && finished_process_pid == current_process->pid) {
+                printf("Process %d finished via signal at time %d\n", current_process->id, currentTime);
                 int finishTime = getClk();
                 int turnaroundTime = finishTime - current_process->arrival_time;
                 float wta = (float)turnaroundTime / current_process->runtime;
+
+                deallocatememory(memory, current_process->startaddress);
+                fprintf(memfile, "At time %d freed %d bytes from process %d from %d to %d\n",
+                        getClk(), current_process->memorysize, current_process->id,
+                        current_process->startaddress, current_process->endaddress);
+                fflush(memfile);
 
                 fprintf(logfile, "At time %d process %d finished arr %d total %d remain 0 wait %d TA %d WTA %.2f\n",
                         finishTime, current_process->id, current_process->arrival_time, current_process->runtime,
                         current_process->waiting_time, turnaroundTime, wta);
 
-                totalWaitTime += current_process->waiting_time;
                 totalTurnaroundTime += turnaroundTime;
                 WTA_sum += wta;
                 runtime_sum += current_process->runtime;
 
                 free(current_process);
                 current_process = NULL;
-            }
-            else
-            {
-                // Decrement remaining time for non-preemptive execution
-                current_process->remaining_time--;
+                process_finished_flag = 0;
+                finished_process_pid = -1;
             }
         }
 
         // Start a new process if none is running and ready queue is not empty
-        if (!current_process && !isPriEmpty(readyQueue))
-        {
-            if (dequeuePri(readyQueue, &current_process) && current_process != NULL)
-            {
+        if (!current_process && !isPriEmpty(readyqueue)) {
+            if (dequeuePri(readyqueue, &current_process) && current_process != NULL) {
                 current_process->waiting_time = getClk() - current_process->arrival_time;
-                fprintf(logfile, "At time %d process %d started arr %d total %d remain %d wait %d\n",
-                        getClk(), current_process->id, current_process->arrival_time, current_process->runtime,
-                        current_process->remaining_time, current_process->waiting_time);
+                totalWaitTime += current_process->waiting_time;
+                allocatememory(memory, current_process);
+
+                int pid = fork();
+                if (pid == -1) {
+                    perror("Fork failed");
+                    free(current_process);
+                    current_process = NULL;
+                    continue;
+                }
+                if (pid == 0) {
+                    char runtime_str[10], schedulerID_str[10], id_str[10];
+                    sprintf(runtime_str, "%d", current_process->runtime);
+                    sprintf(schedulerID_str, "%d", getppid());
+                    sprintf(id_str, "%d", current_process->id);
+                    execl("./process.out", "process.out", runtime_str, schedulerID_str, id_str, NULL);
+                    perror("execl failed");
+                    exit(1);
+                } else {
+
+                    fprintf(memfile, "At time %d allocated %d bytes for process %d from %d to %d\n",
+                            currentTime, current_process->memorysize, current_process->id,
+                            current_process->startaddress, current_process->endaddress);
+                    fflush(memfile);
+                    current_process->pid = pid;
+                    fprintf(logfile, "At time %d process %d started arr %d total %d remain %d wait %d\n",
+                            getClk(), current_process->id, current_process->arrival_time, current_process->runtime,
+                            current_process->remaining_time, current_process->waiting_time);
+                    fflush(logfile);
+                    printf("Started process %d (pid=%d) at time %d\n", current_process->id, pid, getClk());
+                }
             }
         }
 
-        int currentClk = getClk();
-        if (currentClk > clockTime)
-        {
-            clockTime = currentClk; // Sync with clock if it advances externally
-        }
-        else
-        {
-            while (getClk() == clockTime)
-            {
-                usleep(1000); // Sleep briefly to reduce CPU usage
-            }
-            clockTime = getClk();
-        }
-
-        // Check if the message queue is still active
+        //Check termination condition
         struct msqid_ds buf;
-        if (msgctl(msgq_id, IPC_STAT, &buf) == -1)
-        {
+        if (msgctl(msgq_id, IPC_STAT, &buf) == -1) {
             perror("Error checking message queue status");
             done = 1;
+        } else if (buf.msg_qnum == 0 && totalProcesses > 0 && !current_process && 
+                   isPriEmpty(readyqueue) && isPriEmpty(waitingQueue)) {
+            done = 1;
         }
-        else if (buf.msg_qnum == 0 && totalProcesses > 0 && !current_process && isPriEmpty(readyQueue))
-        {
-            done = 1; // No more messages, no running process, and ready queue empty
+
+        // Clock synchronization
+        while (getClk() == clockTime) {
+            usleep(1000);
         }
+        clockTime = getClk();
     }
 
     // Log performance metrics
-    float cpu_utilization = (getClk() > 1) ? (runtime_sum / (getClk() - 1)) * 100 : 0;
+    float cpu_utilization = (clockTime > 1) ? (runtime_sum / (clockTime - 1)) * 100 : 0;
     float avgWTA = totalProcesses > 0 ? WTA_sum / totalProcesses : 0;
     float avgWaiting = totalProcesses > 0 ? (float)totalWaitTime / totalProcesses : 0;
 
     FILE *perf = fopen("scheduler.perf", "w");
-    if (!perf)
-    {
+    if (!perf) {
         perror("Error opening scheduler.perf");
-    }
-    else
-    {
+    } else {
         fprintf(perf, "CPU utilization = %.2f%%\n", cpu_utilization);
         fprintf(perf, "Avg WTA = %.2f\n", avgWTA);
         fprintf(perf, "Avg Waiting = %.2f\n", avgWaiting);
@@ -221,18 +258,13 @@ void HPF()
     }
 
     fclose(logfile);
-    freePriQueue(readyQueue);
+    freePriQueue(readyqueue);
     freePriQueue(waitingQueue);
 
-    // Clean up message queue
-    if (msgctl(msgq_id, IPC_RMID, NULL) == -1)
-    {
+    if (msgctl(msgq_id, IPC_RMID, NULL) == -1) {
         perror("Error removing message queue");
     }
-
-    destroyClk(true);
-}
-void SRTN()
+}void SRTN()
 {
     fptr = fopen("scheduler.log", "w");
     if (!fptr)
@@ -557,12 +589,12 @@ void RR(int quantum)
 void finishedProcess(int signum)
 {
     int status;
-    int finishedProcessID = wait(&status); // Wait for the process to finish
-
-    if (finishedProcessID > 0)
-    {
-        printf("Reaped finished process with PID: %d\n", finishedProcessID);
-    }
+    int finished_pid = wait(&status);
+    if (finished_pid > 0) {
+        printf("Reaped finished process with PID: %d\n", finished_pid);
+        process_finished_flag = 1;
+        finished_process_pid = finished_pid;
+}
 }
 void terminategenerator(int signum)
 {
