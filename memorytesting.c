@@ -11,22 +11,14 @@ int main()
     root->is_free = true;
     root->pcbID = -1;
     root->left = root->right = NULL;
-    // typedef struct buddyMemory
-    // {
-    //     int memsize;
-    //     int start;
-    //     bool is_free;
-    //     int pcbID;
-    //     struct BuddyMemory *left;
-    //     struct BuddyMemory *right;
-    // } BuddyMemory;
-    // Define PCBs with updated structure
+
+    // Define PCBs with 256 memory size
     PCB pcb1 = {
         .id = 1,
         .arrival_time = 4,
         .runtime = 11,
         .priority = 9,
-        .state = 0, // Example: 0 = Ready
+        .state = 0,
         .remaining_time = 11,
         .waiting_time = 0,
         .pid = -1,
@@ -35,7 +27,7 @@ int main()
         .stopped_time = -1,
         .restarted_time = -1,
         .remainingTimeAfterStop = -1,
-        .memorysize = 32,
+        .memorysize = 256,
         .startaddress = -1,
         .endaddress = -1};
 
@@ -53,7 +45,7 @@ int main()
         .stopped_time = -1,
         .restarted_time = -1,
         .remainingTimeAfterStop = -1,
-        .memorysize = 128,
+        .memorysize = 256,
         .startaddress = -1,
         .endaddress = -1};
 
@@ -71,7 +63,7 @@ int main()
         .stopped_time = -1,
         .restarted_time = -1,
         .remainingTimeAfterStop = -1,
-        .memorysize = 383,
+        .memorysize = 256,
         .startaddress = -1,
         .endaddress = -1};
 
@@ -89,7 +81,7 @@ int main()
         .stopped_time = -1,
         .restarted_time = -1,
         .remainingTimeAfterStop = -1,
-        .memorysize = 60,
+        .memorysize = 256,
         .startaddress = -1,
         .endaddress = -1};
 
@@ -107,58 +99,59 @@ int main()
         .stopped_time = -1,
         .restarted_time = -1,
         .remainingTimeAfterStop = -1,
-        .memorysize = 64,
+        .memorysize = 256,
         .startaddress = -1,
         .endaddress = -1};
 
-    // Test allocations
-    printf("Allocating PCB 4 (60 bytes): %s", allocatememory(root, &pcb4) ? "Success" : "Failed");
-    printf(" in start = %d\n", pcb4.startaddress);
-    printf("Allocating PCB 3 (383 bytes): %s", allocatememory(root, &pcb3) ? "Success" : "Failed");
-    printf(" in start = %d\n", pcb3.startaddress);
-    printf("Allocating PCB 5 (64 bytes): %s", allocatememory(root, &pcb5) ? "Success" : "Failed");
-    printf(" in start = %d\n", pcb5.startaddress);
-    printf("Allocating PCB 1 (32 bytes): %s", allocatememory(root, &pcb1) ? "Success" : "Failed");
+    PCB pcb6 = {
+        .id = 6,
+        .arrival_time = 25,
+        .runtime = 5,
+        .priority = 7,
+        .state = 0,
+        .remaining_time = 5,
+        .waiting_time = 0,
+        .pid = -1,
+        .start_time = -1,
+        .finished_time = -1,
+        .stopped_time = -1,
+        .restarted_time = -1,
+        .remainingTimeAfterStop = -1,
+        .memorysize = 256,
+        .startaddress = -1,
+        .endaddress = -1};
+
+    // Allocate 4 PCBs
+    printf("Allocating PCB 1 (256 bytes): %s", allocatememory(root, &pcb1) ? "Success" : "Failed");
     printf(" in start = %d\n", pcb1.startaddress);
-    printf("Allocating PCB 2 (398 bytes): %s", allocatememory(root, &pcb2) ? "Success" : "Failed");
+    printf("Allocating PCB 2 (256 bytes): %s", allocatememory(root, &pcb2) ? "Success" : "Failed");
     printf(" in start = %d\n", pcb2.startaddress);
+    printf("Allocating PCB 3 (256 bytes): %s", allocatememory(root, &pcb3) ? "Success" : "Failed");
+    printf(" in start = %d\n", pcb3.startaddress);
+    printf("Allocating PCB 4 (256 bytes): %s", allocatememory(root, &pcb4) ? "Success" : "Failed");
+    printf(" in start = %d\n", pcb4.startaddress);
 
     // Display memory tree
-    printf("\nMemory Tree:\n");
+    printf("\nMemory Tree After Allocations:\n");
     displayTree(root, 0, "Root");
 
-    //Deallocate PCB 2
+    // Deallocate PCB 1
     printf("\nDeallocating PCB 1:\n");
     deallocatememory(root, pcb1.startaddress);
 
-    //Display memory tree after deallocation
-    printf("\nMemory Tree After Deallocation:\n");
-    displayTree(root, 0,"Root");
+    // Display memory tree after deallocation
+    printf("\nMemory Tree After Deallocating PCB 1:\n");
+    displayTree(root, 0, "Root");
 
-        //Deallocate PCB 2
-    printf("\nDeallocating PCB 5:\n");
-    deallocatememory(root, pcb5.startaddress);
+    // Allocate 2 more PCBs
+    printf("\nAllocating PCB 5 (256 bytes): %s", allocatememory(root, &pcb5) ? "Success" : "Failed");
+    printf(" in start = %d\n", pcb5.startaddress);
+    printf("Allocating PCB 6 (256 bytes): %s", allocatememory(root, &pcb6) ? "Success" : "Failed");
+    printf(" in start = %d\n", pcb6.startaddress);
 
-    //Display memory tree after deallocation
-    printf("\nMemory Tree After Deallocation:\n");
-    displayTree(root, 0,"Root");
-
-        //Deallocate PCB 2
-    printf("\nDeallocating PCB 4:\n");
-    deallocatememory(root, pcb4.startaddress);
-
-    //Display memory tree after deallocation
-    printf("\nMemory Tree After Deallocation:\n");
-    displayTree(root, 0,"Root");
-
-    //Deallocate PCB 2
-    printf("\nDeallocating PCB 3:\n");
-    deallocatememory(root, pcb3.startaddress);
-
-    //Display memory tree after deallocation
-    printf("\nMemory Tree After Deallocation:\n");
-    displayTree(root, 0,"Root");
-
+    // Display final memory tree
+    printf("\nFinal Memory Tree:\n");
+    displayTree(root, 0, "Root");
 
     // Free the root block
     free(root);

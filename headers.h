@@ -412,33 +412,42 @@ bool allocatememory(BuddyMemory *node, PCB *pcb)
 
 int deallocatememory(BuddyMemory *node, int startaddress)
 {
-    if(!node )return 0;
-    if(node->left==NULL && node->right==NULL)
+    if (!node) return 0;
+
+    // Base case: leaf node
+    if (node->left == NULL && node->right == NULL)
     {
-        if(node->start==startaddress && node->is_free==false)
+        if (node->start == startaddress && !node->is_free)
         {
-            node->is_free=true;
-            node->pcbID=-1;
+            node->is_free = true;
+            node->pcbID = -1;
             return 1;
         }
         return 0;
     }
-    int leftfree=deallocatememory(node->left,startaddress);
-    int rightfree=deallocatememory(node->right,startaddress);
-    if(leftfree || rightfree)
+
+    // Recurse into children
+    int leftfree = deallocatememory(node->left, startaddress);
+    int rightfree = deallocatememory(node->right, startaddress);
+
+    // Merge only if a block was freed and both children are free, unallocated, and leaf nodes
+    if ((leftfree || rightfree) &&
+        node->left && node->right &&
+        node->left->is_free && node->right->is_free &&
+        node->left->pcbID == -1 && node->right->pcbID == -1 &&
+        node->left->left == NULL && node->left->right == NULL &&
+        node->right->left == NULL && node->right->right == NULL)
     {
-        if(node->left->is_free && node->right->is_free)
-        {
-            free(node->left);
-            free(node->right);
-            node->left=NULL;
-            node->right=NULL;
-            node->is_free=true;
-            node->pcbID=-1;
-        }
+        free(node->left);
+        free(node->right);
+        node->left = NULL;
+        node->right = NULL;
+        node->is_free = true;
+        node->pcbID = -1;
         return 1;
     }
-    return 0;
+
+    return leftfree || rightfree;
 }
 void displayTree(BuddyMemory *head, int depth, const char *position)
 {
