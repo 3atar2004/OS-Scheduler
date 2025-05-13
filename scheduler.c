@@ -267,7 +267,9 @@ void HPF() {
     if (msgctl(msgq_id, IPC_RMID, NULL) == -1) {
         perror("Error removing message queue");
     }
-}void SRTN()
+}
+
+void SRTN()
 {
     fptr = fopen("scheduler.log", "w");
     if (!fptr)
@@ -275,170 +277,153 @@ void HPF() {
         printf("Error opening scheduler.log\n");
         return;
     }
-    fprintf(fptr, "#At time x process y state arr w total z remain y wait k\n");
-    fflush(fptr);
-
-    FILE *memoryLog = fopen("memory.log", "w");
-    if (!memoryLog)
+    mptr = fopen("memory.log", "w");
+    if (!mptr)
     {
         printf("Error opening memory.log\n");
         fclose(fptr);
         return;
     }
-    fprintf(memoryLog, "#At time x allocated y bytes for process z from i to j\n");
-    fflush(memoryLog);
+
+    fprintf(fptr, "#At time x process y state arr w total z remain y wait k\n");
+    fflush(fptr);
+    fprintf(mptr, "#At time x allocated y bytes for process z from i to j\n");
+    fflush(mptr);
 
     PCB *runningProcess = NULL;
-    int lastTime = -1;
+    int wtaArrayIndex = 0;
 
-    while (!isEmpty(readyQueue) || queueopen || runningProcess != NULL)
+    while (!isEmpty(readyQueue) || queueopen || runningProcess)
     {
         int currentTime = getClk();
-        if (currentTime == lastTime)
-            continue;
-        lastTime = currentTime;
-
-        // Receive new arrivals
         receiveNewProcessesNonBlocking();
 
-        // Check for preemption
-        if (!isEmpty(readyQueue))
+        // Try to allocate memory for waiting processes after any change
+        while (!isPriEmpty(waitingQueue))
         {
-            PCB *front;
-            peek(readyQueue, &front);
-
-            if (runningProcess == NULL || front->remaining_time < runningProcess->remaining_time)
+            PCB *waitingProcess;
+            peekPri(waitingQueue, &waitingProcess);
+            if (allocatememory(memory, waitingProcess))
             {
-                if (runningProcess != NULL)
+                dequeuePri(waitingQueue, &waitingProcess);
+                enqueueByRemainingTime(readyQueue, waitingProcess);
+                fprintf(mptr, "At time %d allocated %d bytes for process %d from %d to %d\n",
+                        getClk(), waitingProcess->memorysize, waitingProcess->id,
+                        waitingProcess->startaddress, waitingProcess->endaddress);
+                fflush(mptr);
+            }
+            else break;
+        }
+
+        // Preemption: always run the process with the shortest remaining time
+        if (!runningProcess && !isEmpty(readyQueue))
+        {
+            dequeue(readyQueue, &runningProcess);
+            if (runningProcess->pid == -1)
+            {
+                runningProcess->pid = fork();
+                if (runningProcess->pid == 0)
                 {
-                    kill(runningProcess->pid, SIGSTOP);
-                    runningProcess->state = STOPPED;
-                    runningProcess->stopped_time = currentTime;
-                    fprintf(fptr, "At time %d process %d stopped arr %d total %d remain %d wait %d\n",
-                            currentTime, runningProcess->id, runningProcess->arrival_time,
-                            runningProcess->runtime, runningProcess->remaining_time,
-                            runningProcess->waiting_time);
-                    fflush(fptr);
-                    enqueueByRemainingTime(readyQueue, runningProcess);
+                    char runtimeStr[15], schedulerIDStr[15], processIDStr[15];
+                    sprintf(runtimeStr, "%d", runningProcess->runtime);
+                    sprintf(schedulerIDStr, "%d", getppid());
+                    sprintf(processIDStr, "%d", runningProcess->id);
+                    execl("./process.out", "process.out", runtimeStr, schedulerIDStr, processIDStr, NULL);
+                    exit(1);
                 }
-
-                dequeue(readyQueue, &runningProcess);
-                if (runningProcess->pid == -1)
-                {
-                    // Allocate memory for the process
-                    if (!allocatememory(memory, runningProcess))
-                    {
-                        printf("Memory allocation failed for process %d\n", runningProcess->id);
-                        enqueueByRemainingTime(readyQueue, runningProcess);
-                        runningProcess = NULL;
-                        continue;
-                    }
-
-                    fprintf(memoryLog, "At time %d allocated %d bytes for process %d from %d to %d\n",
-                            currentTime, runningProcess->memorysize, runningProcess->id,
-                            runningProcess->startaddress, runningProcess->endaddress);
-                    fflush(memoryLog);
-
-                    runningProcess->start_time = currentTime;
-                    runningProcess->waiting_time = currentTime - runningProcess->arrival_time;
-                    totalWaitTime += runningProcess->waiting_time;
-
-                    int pid = fork();
-                    if (pid == 0)
-                    {
-                        char runtime_str[5], schedulerID_str[5], id_str[5];
-                        sprintf(runtime_str, "%d", runningProcess->runtime);
-                        sprintf(schedulerID_str, "%d", getppid());
-                        sprintf(id_str, "%d", runningProcess->id);
-                        execl("./process.out", "process.out", runtime_str, schedulerID_str, id_str, NULL);
-                        exit(1);
-                    }
-                    else
-                    {
-                        runningProcess->pid = pid;
-                        runningProcess->state = STARTED;
-                        fprintf(fptr, "At time %d process %d started arr %d total %d remain %d wait %d\n",
-                                currentTime, runningProcess->id, runningProcess->arrival_time,
-                                runningProcess->runtime, runningProcess->remaining_time,
-                                runningProcess->waiting_time);
-                        fflush(fptr);
-                    }
-                }
-                else
-                {
-                    runningProcess->state = RESUMED;
-                    runningProcess->waiting_time += currentTime - runningProcess->stopped_time;
-                    totalWaitTime += currentTime - runningProcess->stopped_time;
-                    kill(runningProcess->pid, SIGCONT);
-                    fprintf(fptr, "At time %d process %d resumed arr %d total %d remain %d wait %d\n",
-                            currentTime, runningProcess->id, runningProcess->arrival_time,
-                            runningProcess->runtime, runningProcess->remaining_time,
-                            runningProcess->waiting_time);
-                    fflush(fptr);
-                }
+                runningProcess->state = STARTED;
+                runningProcess->start_time = getClk();
+                runningProcess->waiting_time = runningProcess->start_time - runningProcess->arrival_time;
+                totalWaitTime += runningProcess->waiting_time;
+                fprintf(fptr, "At time %d process %d started arr %d total %d remain %d wait %d\n",
+                        currentTime, runningProcess->id, runningProcess->arrival_time,
+                        runningProcess->runtime, runningProcess->remaining_time, runningProcess->waiting_time);
+                fflush(fptr);
+            }
+            else
+            {
+                runningProcess->state = RESUMED;
+                runningProcess->restarted_time = getClk();
+                runningProcess->waiting_time += runningProcess->restarted_time - runningProcess->stopped_time;
+                totalWaitTime += runningProcess->restarted_time - runningProcess->stopped_time;
+                fprintf(fptr, "At time %d process %d resumed arr %d total %d remain %d wait %d\n",
+                        getClk(), runningProcess->id, runningProcess->arrival_time,
+                        runningProcess->runtime, runningProcess->remaining_time, runningProcess->waiting_time);
+                fflush(fptr);
+                kill(runningProcess->pid, SIGCONT);
             }
         }
 
-        if (runningProcess != NULL)
+        // Preempt if a new process with shorter remaining time arrives
+        if (runningProcess && !isEmpty(readyQueue))
+        {
+            PCB *front;
+            peek(readyQueue, &front);
+            if (front->remaining_time < runningProcess->remaining_time)
+            {
+                runningProcess->state = STOPPED;
+                runningProcess->stopped_time = getClk();
+                fprintf(fptr, "At time %d process %d stopped arr %d total %d remain %d wait %d\n",
+                        getClk(), runningProcess->id, runningProcess->arrival_time,
+                        runningProcess->runtime, runningProcess->remaining_time, runningProcess->waiting_time);
+                fflush(fptr);
+                enqueueByRemainingTime(readyQueue, runningProcess);
+                kill(runningProcess->pid, SIGSTOP);
+                runningProcess = NULL;
+                continue;
+            }
+        }
+
+        // Run the current process for one tick
+        if (runningProcess)
         {
             runningProcess->remaining_time--;
             totalRunTime++;
             if (runningProcess->remaining_time == 0)
             {
+                runningProcess->state = FINISHED;
                 runningProcess->finished_time = getClk();
                 int TA = runningProcess->finished_time - runningProcess->arrival_time;
                 float WTA = (float)TA / runningProcess->runtime;
-
+                WTA_values[wtaArrayIndex++] = WTA;
                 sumTA += TA;
                 sumWTA += WTA;
-                WTA_values[finished_index++] = WTA;
-
-                runningProcess->state = FINISHED;
                 fprintf(fptr, "At time %d process %d finished arr %d total %d remain 0 wait %d TA %d WTA %.2f\n",
-                        runningProcess->finished_time, runningProcess->id,
-                        runningProcess->arrival_time, runningProcess->runtime,
-                        runningProcess->waiting_time, TA, WTA);
+                        getClk(), runningProcess->id, runningProcess->arrival_time,
+                        runningProcess->runtime, runningProcess->waiting_time, TA, WTA);
                 fflush(fptr);
 
-                // Free memory for the process
                 deallocatememory(memory, runningProcess->startaddress);
-                fprintf(memoryLog, "At time %d freed %d bytes from process %d from %d to %d\n",
-                        runningProcess->finished_time, runningProcess->memorysize, runningProcess->id,
+                fprintf(mptr, "At time %d freed %d bytes from process %d from %d to %d\n",
+                        getClk(), runningProcess->memorysize, runningProcess->id,
                         runningProcess->startaddress, runningProcess->endaddress);
-                fflush(memoryLog);
+                fflush(mptr);
 
                 free(runningProcess);
                 runningProcess = NULL;
             }
         }
-    }
 
-    // CALCULATE PERFORMANCE METRICS
-    int finishTime = getClk();
-    float cpu_util = ((float)totalRunTime / finishTime) * 100.0;
-    avgWaiting = (float)totalWaitTime / numberOfProcesses;
-    avgWTA = sumWTA / numberOfProcesses;
-
-    // Calculate standard deviation of WTA using the provided function
-    stdWTA = calculateStdWTA(WTA_values, numberOfProcesses, avgWTA);
-
-    // WRITE TO PERF FILE
-    FILE *perf = fopen("scheduler.perf", "w");
-    if (perf)
-    {
-        fprintf(perf, "CPU utilization = %.2f%%\n", cpu_util);
-        fprintf(perf, "Avg WTA = %.2f\n", avgWTA);
-        fprintf(perf, "Avg Waiting = %.2f\n", avgWaiting);
-        fprintf(perf, "Std WTA = %.2f\n", stdWTA);
-        fclose(perf);
-    }
-    else
-    {
-        printf("Error opening scheduler.perf\n");
+        // Busy wait for the next clock tick
+        int tick = getClk();
+        while (getClk() == tick);
     }
 
     fclose(fptr);
-    fclose(memoryLog);
+    fclose(mptr);
+
+    int finishTime = getClk();
+    float cpuUtilization = ((float)totalRunTime / (float)finishTime) * 100.0;
+    float avgWaiting = (float)totalWaitTime / numberOfProcesses;
+    float avgWTA = sumWTA / numberOfProcesses;
+    float stdWTA = calculateStdWTA(WTA_values, wtaArrayIndex, avgWTA);
+    FILE *perf = fopen("scheduler.perf", "w");
+    fprintf(perf, "CPU utilization = %.2f %% \n", cpuUtilization);
+    fprintf(perf, "Avg WTA = %.2f \n", avgWTA);
+    fprintf(perf, "Avg Waiting = %.2f \n", avgWaiting);
+    fprintf(perf, "Std WTA = %.2f \n", stdWTA);
+    fclose(perf);
+    freeQueue(readyQueue);
 }
 
 void RR(int quantum)
