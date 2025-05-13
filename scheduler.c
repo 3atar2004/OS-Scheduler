@@ -30,6 +30,7 @@ void receiveNewProcessesNonBlocking();
 
 int msgq_id;
 CircularQueue *readyQueue;
+PriorityQueue *waitingQueue;
 FILE *fptr;
 FILE *mptr;
 BuddyMemory *memory;
@@ -59,6 +60,8 @@ int main(int argc, char *argv[])
 
     readyQueue = (CircularQueue *)malloc(sizeof(CircularQueue));
     initQueue(readyQueue);
+
+    waitingQueue = createQueue();
 
 
     switch (chosenAlgorithm) // 1- Non Preemptive HPF, 2- SRTN, 3- RR
@@ -488,14 +491,6 @@ void RR(int quantum)
             dequeue(readyQueue, &runningProcess);
             if (runningProcess->pid == -1)
             {
-                // Allocate memory for the process
-                if (!allocatememory(memory, runningProcess))
-                {
-                    printf("Memory allocation failed for process %d !\n", runningProcess->id);
-                    enqueue(readyQueue, runningProcess);
-                    runningProcess = NULL;
-                    continue;
-                }
                 runningProcess->pid = fork();
                 if (runningProcess->pid == 0)
                 {
@@ -514,8 +509,8 @@ void RR(int quantum)
                 totalRunTime += runningProcess->runtime; // Update total run time
                 fprintf(fptr, "At time %d process %d %s arr %d total %d remain %d wait %d\n", currentTime, runningProcess->id, stateString, runningProcess->arrival_time, runningProcess->runtime, runningProcess->remaining_time, runningProcess->waiting_time);
                 fflush(fptr);
-                fprintf(mptr, "At time %d allocated %d bytes for process %d from %d to %d\n", currentTime, runningProcess->memorysize, runningProcess->id, runningProcess->startaddress, runningProcess->endaddress);
-                fflush(mptr);
+                // fprintf(mptr, "At time %d allocated %d bytes for process %d from %d to %d\n", currentTime, runningProcess->memorysize, runningProcess->id, runningProcess->startaddress, runningProcess->endaddress);
+                // fflush(mptr);
             }
             else
             {
@@ -555,6 +550,21 @@ void RR(int quantum)
                 fprintf(mptr, "At time %d freed %d bytes from process %d from %d to %d\n", getClk() + 1, runningProcess->memorysize, runningProcess->id, runningProcess->startaddress, runningProcess->endaddress);
                 fflush(mptr);
                 runningProcess = NULL;
+                while (!isPriEmpty(waitingQueue))
+                {
+                    PCB *waitingProcess;
+                    peekPri(waitingQueue, &waitingProcess);
+                    if (allocatememory(memory, waitingProcess))
+                    {
+                        dequeuePri(waitingQueue, &waitingProcess);
+                        printf("At time %d Dequeued process %d from waiting queue\n", getClk() + 1, waitingProcess->id);
+                        enqueue(readyQueue, waitingProcess);
+                        printf("At time %d Enqueued process %d to ready queue\n", getClk() + 1, waitingProcess->id);
+                        fprintf(mptr, "At time %d allocated %d bytes for process %d from %d to %d\n", getClk() + 1, waitingProcess->memorysize, waitingProcess->id, waitingProcess->startaddress, waitingProcess->endaddress);
+                        fflush(mptr);
+                    }
+                    else break;
+                }
             }
         }
 
@@ -684,13 +694,23 @@ void receiveNewProcessBlocking()
     {
         PCB *arrivedPCB = malloc(sizeof(PCB));
         memcpy(arrivedPCB, &msg.pcb, sizeof(PCB));
+        if (allocatememory(memory, arrivedPCB) == -1)
+        {
+            printf("Memory allocation failed for process %d, enqueing in waiting queue!\n", arrivedPCB->id);
+            enqueuePri(waitingQueue, arrivedPCB, arrivedPCB->memorysize);
+            return;
+        }
+        printf("Successful memory allocation for process %d, enqueing in ready queue!\n", arrivedPCB->id);
         enqueue(readyQueue, arrivedPCB);
+        printf("Allocated %d bytes for process %d from %d to %d\n", arrivedPCB->memorysize, arrivedPCB->id, arrivedPCB->startaddress, arrivedPCB->endaddress);
+        fprintf(mptr, "At time %d allocated %d bytes for process %d from %d to %d\n", getClk(), arrivedPCB->memorysize, arrivedPCB->id, arrivedPCB->startaddress, arrivedPCB->endaddress);
+        fflush(mptr);
         printf("Scheduler received process %d at time %d with runtime %d and priority %d \n", arrivedPCB->id, getClk(), arrivedPCB->runtime, arrivedPCB->priority);
         numberOfProcesses++;
     }
     else
     {
-        perror("Error receiving new process from message queue");
+        perror("Error receiving new process from message queue!\n");
     }
 }
 
@@ -702,9 +722,21 @@ void receiveNewProcessesNonBlocking()
     {
         PCB *arrivedPCB = malloc(sizeof(PCB));
         memcpy(arrivedPCB, &msg.pcb, sizeof(PCB));
-        enqueue(readyQueue, arrivedPCB);
-        printf("Scheduler received process %d at time %d with runtime %d and priority %d \n", arrivedPCB->id, getClk(), arrivedPCB->runtime, arrivedPCB->priority);
-        numberOfProcesses++;
+        if (!allocatememory(memory, arrivedPCB))
+        {
+            printf("Memory allocation failed for process %d, enqueing in waiting queue!\n", arrivedPCB->id);
+            enqueuePri(waitingQueue, arrivedPCB, arrivedPCB->memorysize);
+        }
+        else
+        {
+            enqueue(readyQueue, arrivedPCB);
+            printf("Successful memory allocation for process %d, enqueing in ready queue!\n", arrivedPCB->id);
+            printf("Allocated %d bytes for process %d from %d to %d\n", arrivedPCB->memorysize, arrivedPCB->id, arrivedPCB->startaddress, arrivedPCB->endaddress);
+            fprintf(mptr, "At time %d allocated %d bytes for process %d from %d to %d\n", getClk(), arrivedPCB->memorysize, arrivedPCB->id, arrivedPCB->startaddress, arrivedPCB->endaddress);
+            fflush(mptr);
+            printf("Scheduler received process %d at time %d with runtime %d and priority %d \n", arrivedPCB->id, getClk(), arrivedPCB->runtime, arrivedPCB->priority);
+            numberOfProcesses++;
+        }
         status = msgrcv(msgq_id, &msg, sizeof(msg) - sizeof(long), 0, IPC_NOWAIT);
     }
 }

@@ -266,6 +266,16 @@ bool isPriEmpty(PriorityQueue *pq)
     return pq->front == NULL;
 }
 
+int peekPri(PriorityQueue* queue, PCB **pcb_out) {
+    if (queue->front == NULL) {
+        return 0; // Queue is empty
+    }
+    *pcb_out = queue->front->pcb;
+    return 1; // Success
+}
+
+
+
 // Enqueue an element in ascending order
 void enqueuePri(PriorityQueue *pq, PCB *pcb, int pri)
 {
@@ -401,11 +411,18 @@ bool allocatememory(BuddyMemory *node, PCB *pcb)
 
     // Recurse: try left first
     if (allocatememory(node->left, pcb))
+    {
         return true;
+    }
+
+        
 
     // Then try right
     if (allocatememory(node->right, pcb))
+    {
         return true;
+    }
+        
 
     return false;
 }
