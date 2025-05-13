@@ -293,6 +293,9 @@ void SRTN()
     PCB *runningProcess = NULL;
     int wtaArrayIndex = 0;
 
+    // FIX: Receive the first process before entering the loop
+    receiveNewProcessBlocking();
+
     while (!isEmpty(readyQueue) || queueopen || runningProcess)
     {
         int currentTime = getClk();
@@ -407,6 +410,10 @@ void SRTN()
         // Busy wait for the next clock tick
         int tick = getClk();
         while (getClk() == tick);
+
+        // FIX: Terminate if all queues are empty and generator is done
+        if (isEmpty(readyQueue) && !runningProcess && !queueopen && isPriEmpty(waitingQueue))
+            break;
     }
 
     fclose(fptr);
