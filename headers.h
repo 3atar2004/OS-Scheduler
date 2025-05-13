@@ -252,6 +252,14 @@ typedef struct PriorityQueue
     priNode *front;
 } PriorityQueue;
 
+int peekPri(PriorityQueue *pq, PCB **pcb)
+{
+    if (pq == NULL || pq->front == NULL)
+        return 0;
+
+    *pcb = pq->front->pcb;
+    return 1;
+}
 // Create a new priority queue
 PriorityQueue *createQueue()
 {
