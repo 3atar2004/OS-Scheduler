@@ -12,6 +12,7 @@ int main(int argc, char *argv[])
         printf("Invalid number of arguments!\n");
         exit(1);
     }
+    
     // 1. Read the input files.
     CircularQueue *PCBs = (CircularQueue *)malloc(sizeof(CircularQueue));
     initQueue(PCBs);
