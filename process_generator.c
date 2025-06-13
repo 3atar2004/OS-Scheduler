@@ -25,14 +25,14 @@ int main(int argc, char *argv[])
     }
     int id, arrival, runtime, priority,memsize;
     fscanf(pFile, "%*[^\n]\n");
-    printf("----------------------------------Processes--------------------------------------\n");
-    printf("\t\tID\t   Arrival Time\t   Running Time\t    Priority\t  Memory Size\n");
-    printf("----------------------------------------------------------------------------------\n");
+    printf("-----------------------------------------Processes----------------------------------------\n");
+    printf("\t\tID\t   Arrival Time\t   Running Time\t    Priority\t    Memory Size\n");
+    printf("------------------------------------------------------------------------------------------\n");
     int count = 1;
-    while (fscanf(pFile, "%d\t%d\t%d\t%d\t%d\n", &id, &arrival, &runtime, &priority,&memsize) == 5)
+    while (fscanf(pFile, "%d\t%d\t%d\t%d\t%d\n", &id, &arrival, &runtime, &priority, &memsize) == 5)
     {
         printf("Process %d:\t", count);
-        printf("%d\t\t%d\t\t%d\t\t%d\t %d\n", id, arrival, runtime, priority,memsize);
+        printf("%d\t\t%d\t\t%d\t\t%d\t\t%d\n", id, arrival, runtime, priority,memsize);
         PCB *readpcb = malloc(sizeof(PCB));
         readpcb->id = id;
         readpcb->arrival_time = arrival;
