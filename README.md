@@ -73,11 +73,11 @@ Supports the following CPU scheduling algorithms:
 1. **SRTN (Shortest Remaining Time Next)**  
    Preemptive version of SJF (Shortest Job First) that always selects the process with the shortest remaining running time.
 
-2. **HPF (Highest Priority First)**  
+2. **HPF (Non Preemptive Highest Priority First)**  
    Schedules processes based on static priority values (lower value = higher priority)
 
 3. **RR (Round Robin)**  
-   Time-sliced scheduling with a configurable quantum, simulating preemptive multitasking
+   Time sliced scheduling with a configurable quantum, simulating preemptive multitasking
  
 ### 🧱 Modular System Architecture  
 Clean separation between the **Process Generator**, **Scheduler**, and **Clock**, each implemented as an independent process to simulate a real OS environment.
