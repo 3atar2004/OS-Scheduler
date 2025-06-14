@@ -57,6 +57,57 @@ The system consists of four main components. The Process Generator, the Clock, t
 
 ![image](https://github.com/user-attachments/assets/454c093f-2ec9-497e-92eb-7d8ff3f16238)
 
+## Data Structures Used
+The following data structures were implemented to support the scheduling and memory management components:
+
+• **Circular Queue**: Used to store Process Control Blocks (PCBs) for Round Robin (RR) scheduling, enabling efficient enqueue and dequeue operations in a cyclic manner.
+
+• **Priority Queue**: Used to store PCBs for Highest Priority First (HPF) scheduling, ensuring processes with the highest priority are selected first.
+
+• **Buddy Memory System**: Implemented as a binary tree to manage dynamic memory allocation for PCBs, allowing efficient allocation and deallocation of memory blocks in powers of two.
+
+## Algorithm Explanation and Results
+### 1. Non Preemptive Highest Priority First (HPF)
+   
+• Selects the PCB with the highest priority from the **Priority Queue**.
+
+• Enqueues PCBs with the highest priority first, then dequeues them one by one without preemption.
+
+• **Result**: Ensures high-priority processes execute first, maintaining strict priority ordering.
+
+### 2. Round Robin (RR)
+   
+• Processes are enqueued in a **Circular Queue** and executed for a fixed time quantum.
+
+• If a new process arrives at preemption time, it is enqueued before the current process, ensuring fair scheduling.
+
+• **Result**: Provides equitable CPU time distribution among processes.
+
+### 3. Shortest Remaining Time Next (SRTN)
+
+• Selects the process with the shortest remaining time from the queue.
+
+• Preempts the current process if a new process with a shorter remaining time arrives.
+
+• **Result**: Minimizes average waiting time by prioritizing processes closest to completion.
+
+### 4 Buddy System (Memory Management)
+• Implemented to manage memory allocation for PCBs.
+
+• Uses a binary tree where each node represents a memory block, with sizes as powers of two (e.g., 256, 512, 1024 bytes).
+
+• **Allocation**: When a PCB requests memory (e.g., 256 bytes), the system finds the smallest free block of at least the requested size (rounded to the next power of two). If the block is larger, it is split into two equal "buddy" blocks, and the process continues recursively until a suitable block is found. The block is then marked as allocated, storing the PCB’s ID and address range.
+
+• **Deallocation**: When a PCB’s memory is freed, the block is marked as free. The system checks if its buddy block is also free and, if so, merges them into a larger block. This process repeats up the tree, reducing fragmentation.
+
+• **Result**: Efficiently allocates and deallocates memory for PCBs, minimizing external fragmentation by maintaining power-of-two block sizes. The system supports dynamic memory needs of processes, as demonstrated by allocating 256-byte blocks for multiple PCBs and correctly handling deallocations without overwriting existing allocations.
+
+## Assumptions
+The following assumptions were made during implementation:
+
+• **SRTN**: When two processes have the same remaining time, the process already running continues to avoid unnecessary context switches.
+
+• **Buddy System**: Memory requests are rounded up to the next power of two to fit the buddy system’s block structure. The minimum block size is assumed to be sufficient for the smallest PCB memory requirement.
 
 ## Features
 ### 🖥️ Interactive Command-Line Interface (CLI)
