@@ -80,7 +80,7 @@ Supports the following CPU scheduling algorithms:
    Time sliced scheduling with a configurable quantum, simulating preemptive multitasking.
  
 ### 🧱 Modular System Architecture  
-Clean separation between the **Process Generator**, **Scheduler**, and **Clock**, each implemented as an independent process to simulate a real OS environment.
+Clean separation between the **Process Generator**, **Scheduler**, **Process** and **Clock**, each implemented as an independent process to simulate a real OS environment.
 
 ![image](https://github.com/user-attachments/assets/7ee8e690-5735-4c2f-b0e1-69e19494c177)
 
