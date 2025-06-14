@@ -2,7 +2,7 @@
 ![OS-logo](https://github.com/user-attachments/assets/371d60a4-0d7b-41dc-be23-98eccdc214e1)
 
 ## About
-This OS scheduler simulates how a CPU manages the execution of multiple processes using fundamental operating system concepts. It recreates a realistic multi-process environment, inter-process communication and scheduling algorithms.
+This OS scheduler simulates how a CPU manages the execution of multiple processes using fundamental operating system concepts. It recreates a realistic multi-process environment using interprocess communication and scheduling algorithms.
 
 The scheduler determines the execution order of processes based on their status and manages them using a data structure that tracks whether each process is Running, Ready, or Blocked (doing I/O, using other resources than CPU or waiting on unavailable resources). Upon creation, each process transitions through these states, closely mimicking real-world OS behavior.
 
