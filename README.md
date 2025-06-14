@@ -91,7 +91,7 @@ The following data structures were implemented to support the scheduling and mem
 
 • **Result**: Minimizes average waiting time by prioritizing processes closest to completion.
 
-### 4 Buddy System (Memory Management)
+### 4. Buddy System (Memory Management)
 • Implemented to manage memory allocation for PCBs.
 
 • Uses a binary tree where each node represents a memory block, with sizes as powers of two (e.g., 256, 512, 1024 bytes).
