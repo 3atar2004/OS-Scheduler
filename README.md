@@ -11,13 +11,13 @@ Developed in C for the Linux platform, the project utilizes POSIX APIs including
 This was the final project for the CMPS303 - Operating Systems Course.
 
 ## System Architecture
-The system consists of three main components. The Process Generator, the Clock, and the Scheduler.
+The system consists of four main components. The Process Generator, the Clock, the Scheduler and Child Processes.
 
 ![image](https://github.com/user-attachments/assets/4b99829c-67b4-432a-a123-e7ef1f9401d2)
 
 ## System Breakdown
 ### 1. Process Generator
-   - Reads process data from an input text file.
+   - Reads process data from an input text file and creates PCBs for each.
    - Prompts the user to select the scheduling algorithm and specify the time quantum if Round Robin is chosen.
    - Initializes the Clock and Scheduler processes, and passes the selected algorithm and quantum to the Scheduler.
    - Sends each process to the Scheduler via a message queue at its corresponding arrival time, as tracked by the Clock.
@@ -44,6 +44,14 @@ The system consists of three main components. The Process Generator, the Clock, 
    - Tracks and switches between processes, enforcing the time quantum and mimicking preemptive multitasking.
    - Maintains detailed logs of process timings and memory allocation for analysis.
    - Ensures proper cleanup of all used system resources such shared memory and message queues after the simulation ends.
+
+### 4. Process
+- Emulates a real running process created via `fork()` by the Scheduler  
+- Executes for its assigned runtime duration
+- Started, Resumed and Stopped by Scheduler using signals.  
+- Sends a signal to the Scheduler upon completion to notify it for cleanup  
+- The Scheduler reaps the process to free system resources and avoid zombies
+
 
 ![image](https://github.com/user-attachments/assets/aedb747c-2f9b-48ff-bf08-c8247fa02556)
 
