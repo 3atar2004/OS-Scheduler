@@ -36,6 +36,7 @@ The system consists of three main components. The Process Generator, the Clock, 
 ### 3. Scheduler
    - Serves as the brain of the system, making all key decisions regarding process execution.
    - Receives processes from the Process Generator via the message queue shared with the Process Generator.
+   - Responsible for memory allocation and deallocation for processes using the buddy system algorithm.
    - Manages process execution using the chosen scheduling algorithm.
    - For each scheduled task, creates a separate Process (child process) to simulate actual process execution.
    - After a process completes, it is properly reaped to free system resources and avoid leaving zombie processes
@@ -51,6 +52,9 @@ The system consists of three main components. The Process Generator, the Clock, 
 Prompts the user to:
 - Select the scheduling algorithm  
 - Enter the time quantum (only required if **Round Robin** is selected)
+
+![image](https://github.com/user-attachments/assets/222943b1-4f3f-45d6-ba0a-fd5149b8eded)
+
 
 ### ⚙️ Multi-Algorithm Scheduling Support
 Supports the following CPU scheduling algorithms:
@@ -83,7 +87,7 @@ Employs **POSIX APIs** including message queues and shared memory for efficient 
 
 
 ### 🧠 Memory Management Integration  
-Allocates and tracks memory usage for each process. If insufficient memory is available, processes are deferred using a **Memory Waiting Priority Queue** (the lower the memory required, the higher the priority).
+Allocates and tracks memory usage for each process using the buddy managment system. If insufficient memory is available, processes are deferred using a **Memory Waiting Priority Queue** (the lower the memory required, the higher the priority).
 
 ![image](https://github.com/user-attachments/assets/608c1152-ccc4-407c-99d3-409578faa019)
 
@@ -104,6 +108,59 @@ Includes a custom test generator file named **`test_generator.c`** to create edg
 Cleans up system resources after execution by detaching and deallocating shared memory, removing message queues and semaphores, and reaping zombie processes.
 
 ![image](https://github.com/user-attachments/assets/e8e8cf2b-c1ec-4802-b8fc-15f58333b2bc)
+
+
+## Collaborators
+- George Ayman
+- Mark Maged Nageh
+- Mohamed Ahmed Mahmoud
+- Omar Ahmed Reda
+
+## Demo (Round Robin with Q = 6)
+
+
+
+https://github.com/user-attachments/assets/88304564-84c6-479e-b171-0dd3653bd9ae
+
+
+## How to Install & Use
+
+### 🔧 Requirements
+- Windows with **WSL (Windows Subsystem for Linux)** enabled  
+- GCC (GNU Compiler Collection)
+---
+
+### 📦 Installation
+
+1. Clone the Repository
+```
+ git clone https://github.com/3atar2004/OS-Scheduler
+```
+2. Navigate to the project directory
+```
+ cd FolderName
+```
+### 🚀 How to Use
+1. Open the project folder in your preferred IDE  
+   > **Recommended:** [Visual Studio Code](https://code.visualstudio.com/) with WSL extension for smooth Linux integration
+
+2. Open a new Ubuntu (WSL) terminal and write the following commands
+
+3. You can view or edit the process data in `processes.txt`  
+   > ⚠️ **Keep the format unchanged**
+4. To generate new processes test cases using the test generator
+   ```
+   gcc test_generator.c -o test_generator.out
+   ./test_generator.out
+   ```
+5. run the following command
+   ```
+   make run
+   ```
+6. Observe output in `memory.log`, `scheduler.log`, `scheduler.perf` for logging and analysis.
+
+   
+
 
 
 
