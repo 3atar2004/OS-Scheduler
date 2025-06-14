@@ -6,7 +6,7 @@ This OS scheduler simulates how a CPU manages the execution of multiple processe
 
 The scheduler determines the execution order of processes based on their status and manages them using a data structure that tracks whether each process is Running, Ready, or Blocked (doing I/O, using other resources than CPU or waiting on unavailable resources). Upon creation, each process transitions through these states, closely mimicking real-world OS behavior.
 
-Developed in C for the Linux platform, the project utilizes POSIX APIs including message queues, shared memory, and semaphores to coordinate process execution and synchronization of the system.
+Developed in C for the Linux platform, the project utilizes POSIX APIs including message queues and shared memory to coordinate process execution and synchronization of the system.
 
 This was the final project for the CMPS303 - Operating Systems Course.
 
