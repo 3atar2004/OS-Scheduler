@@ -116,7 +116,7 @@ Includes a custom test generator file named **`test_generator.c`** to create edg
 
 
 ### 🧹 Safe Resource Cleanup  
-Cleans up system resources after execution by detaching and deallocating shared memory, removing message queues and semaphores, and reaping zombie processes.
+Cleans up system resources after execution by detaching shared memory, removing message queues and reaping zombie processes.
 
 ![image](https://github.com/user-attachments/assets/e8e8cf2b-c1ec-4802-b8fc-15f58333b2bc)
 
