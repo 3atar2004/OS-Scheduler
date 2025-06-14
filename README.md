@@ -36,7 +36,7 @@ The system consists of four main components. The Process Generator, the Clock, t
 ### 3. Scheduler
    - Serves as the brain of the system, making all key decisions regarding process execution.
    - Receives processes from the Process Generator via the message queue shared with the Process Generator.
-   - Responsible for memory allocation and deallocation for processes using the buddy system algorithm with a total memory size of 1024 bytes..
+   - Responsible for memory allocation and deallocation for processes using the buddy system algorithm with a total memory size of 1024 bytes.
    - Manages process execution using the chosen scheduling algorithm.
    - For each scheduled process, creates a separate Process (child process) to simulate actual process execution.
    - Controls execution using signals such as SIGCONT (to resume) and SIGSTOP (to pause), simulating CPU time allocation.
