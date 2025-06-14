@@ -38,12 +38,12 @@ The system consists of four main components. The Process Generator, the Clock, t
    - Receives processes from the Process Generator via the message queue shared with the Process Generator.
    - Responsible for memory allocation and deallocation for processes using the buddy system algorithm.
    - Manages process execution using the chosen scheduling algorithm.
-   - For each scheduled task, creates a separate Process (child process) to simulate actual process execution.
-   - After a process completes, it is properly reaped to free system resources and avoid leaving zombie processes
+   - For each scheduled process, creates a separate Process (child process) to simulate actual process execution.
    - Controls execution using signals such as SIGCONT (to resume) and SIGSTOP (to pause), simulating CPU time allocation.
    - Tracks and switches between processes, enforcing the time quantum and mimicking preemptive multitasking.
+   - After a process completes, it is properly reaped to free system resources and avoid leaving zombie processes
    - Maintains detailed logs of process timings and memory allocation for analysis.
-   - Ensures proper cleanup of all used system resources such shared memory and message queues after the simulation ends.
+   - Ensures proper cleanup of all used system resources such as shared memory and message queues after the simulation ends.
 
      ![image](https://github.com/user-attachments/assets/aedb747c-2f9b-48ff-bf08-c8247fa02556)
 
