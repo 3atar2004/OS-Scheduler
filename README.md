@@ -45,6 +45,9 @@ The system consists of four main components. The Process Generator, the Clock, t
    - Maintains detailed logs of process timings and memory allocation for analysis.
    - Ensures proper cleanup of all used system resources such shared memory and message queues after the simulation ends.
 
+     ![image](https://github.com/user-attachments/assets/aedb747c-2f9b-48ff-bf08-c8247fa02556)
+
+
 ### 4. Process
 - Emulates a real running process created via `fork()` by the Scheduler  
 - Executes for its assigned runtime duration
@@ -52,8 +55,8 @@ The system consists of four main components. The Process Generator, the Clock, t
 - Sends a signal to the Scheduler upon completion to notify it for cleanup  
 - The Scheduler reaps the process to free system resources and avoid zombies
 
+![image](https://github.com/user-attachments/assets/454c093f-2ec9-497e-92eb-7d8ff3f16238)
 
-![image](https://github.com/user-attachments/assets/aedb747c-2f9b-48ff-bf08-c8247fa02556)
 
 ## Features
 ### 🖥️ Interactive Command-Line Interface (CLI)
