@@ -26,7 +26,7 @@ The system consists of four main components. The Process Generator, the Clock, t
 
    
 ### 2. Clock
-   - Acts as the system’s global time reference
+   - Acts as the system’s global time reference.
    - Broadcasts the current time to all components (e.g. Process Generator and Scheduler) using shared memory.
    - Synchronizes all processes to ensure consistent execution and coordinated event logging.
 
@@ -41,7 +41,7 @@ The system consists of four main components. The Process Generator, the Clock, t
    - For each scheduled process, creates a separate Process (child process) to simulate actual process execution.
    - Controls execution using signals such as SIGCONT (to resume) and SIGSTOP (to pause), simulating CPU time allocation.
    - Tracks and switches between processes, enforcing the time quantum and mimicking preemptive multitasking.
-   - After a process completes, it is properly reaped to free system resources and avoid leaving zombie processes
+   - After a process completes, it is properly reaped to free system resources and avoid leaving zombie processes.
    - Maintains detailed logs of process timings and memory allocation for analysis.
    - Ensures proper cleanup of all used system resources such as shared memory and message queues after the simulation ends.
 
@@ -49,11 +49,11 @@ The system consists of four main components. The Process Generator, the Clock, t
 
 
 ### 4. Process
-- Emulates a real running process created via `fork()` by the Scheduler  
-- Executes for its assigned runtime duration
+- Emulates a real running process created via `fork()` by the Scheduler.  
+- Executes for its assigned runtime duration.
 - Started, Resumed and Stopped by Scheduler using signals.  
-- Sends a signal to the Scheduler upon completion to notify it for cleanup  
-- The Scheduler reaps the process to free system resources and avoid zombies
+- Sends a signal to the Scheduler upon completion to notify it for cleanup.  
+- The Scheduler reaps the process to free system resources and avoid zombies.
 
 ![image](https://github.com/user-attachments/assets/454c093f-2ec9-497e-92eb-7d8ff3f16238)
 
@@ -61,8 +61,8 @@ The system consists of four main components. The Process Generator, the Clock, t
 ## Features
 ### 🖥️ Interactive Command-Line Interface (CLI)
 Prompts the user to:
-- Select the scheduling algorithm  
-- Enter the time quantum (only required if **Round Robin** is selected)
+- Select the scheduling algorithm.  
+- Enter the time quantum (only required if **Round Robin** is selected).
 
 ![image](https://github.com/user-attachments/assets/222943b1-4f3f-45d6-ba0a-fd5149b8eded)
 
@@ -74,10 +74,10 @@ Supports the following CPU scheduling algorithms:
    Preemptive version of SJF (Shortest Job First) that always selects the process with the shortest remaining running time.
 
 2. **HPF (Non Preemptive Highest Priority First)**  
-   Schedules processes based on static priority values (lower value = higher priority)
+   Schedules processes based on static priority values (lower value = higher priority).
 
 3. **RR (Round Robin)**  
-   Time sliced scheduling with a configurable quantum, simulating preemptive multitasking
+   Time sliced scheduling with a configurable quantum, simulating preemptive multitasking.
  
 ### 🧱 Modular System Architecture  
 Clean separation between the **Process Generator**, **Scheduler**, and **Clock**, each implemented as an independent process to simulate a real OS environment.
@@ -98,7 +98,7 @@ Employs **POSIX APIs** including message queues and shared memory for efficient 
 
 
 ### 🧠 Memory Management Integration  
-Allocates and tracks memory usage for each process using the buddy managment system. If insufficient memory is available, processes are deferred using a **Memory Waiting Priority Queue** (the lower the memory required, the higher the priority).
+Allocates and tracks memory usage for each process using the buddy managment system. If no sufficient memory is available for a process, this process is deferred using a **Memory Waiting Priority Queue** (the lower the memory required, the higher the priority).
 
 ![image](https://github.com/user-attachments/assets/608c1152-ccc4-407c-99d3-409578faa019)
 
