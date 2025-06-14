@@ -17,7 +17,7 @@ The system consists of four main components. The Process Generator, the Clock, t
 
 ## System Breakdown
 ### 1. Process Generator
-   - Reads process data from an input text file and creates PCBs for each.
+   - Reads process data from an input text file and creates PCB (Process Control Block) for each process read.
    - Prompts the user to select the scheduling algorithm and specify the time quantum if Round Robin is chosen.
    - Initializes the Clock and Scheduler processes, and passes the selected algorithm and quantum to the Scheduler.
    - Sends each process to the Scheduler via a message queue at its corresponding arrival time, as tracked by the Clock.
